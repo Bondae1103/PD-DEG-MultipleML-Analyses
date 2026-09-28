@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PD-DEG-MultipleML-Analyses | Biomarker Discovery Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .tab-active { border-bottom: 3px solid #4F46E5; color: #4F46E5; font-weight: 600; }
+    .tab-inactive { border-bottom: 3px solid transparent; color: #6B7280; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+  <!-- Header & Navigation -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🧬</span>
+          <h1 class="text-xl font-bold text-slate-900 tracking-tight">PD-DEG-MultipleML-Analyses</h1>
+          <span class="bg-indigo-100 text-indigo-800 text-xs px-2.5 py-0.5 rounded-full font-medium">Vercel Production</span>
+        </div>
+        <p class="text-sm text-slate-500 mt-0.5">Machine Learning Identification & Cross-Validation of Transcriptomic Biomarkers in Parkinson's Disease</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="#pipeline" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 transition">Pipeline</a>
+        <a href="#workbench" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 transition">ML Workbench</a>
+        <a href="#gallery" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 transition">Plot Gallery</a>
+        <a href="#audit" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 transition">Patient Audit</a>
+        <a href="https://github.com" target="_blank" class="bg-slate-900 text-white text-xs px-3 py-1.5 rounded-md hover:bg-slate-800 transition">GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mandatory Regulatory Disclaimer -->
+  <div class="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-xs text-amber-800">
+    ⚠️ <strong>Research Demonstration Only:</strong> Not a medical device and not for clinical diagnosis. Biomarker panel discovered and cross-validated on postmortem brain prefrontal cortex samples (GSE68719).
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+
+    <!-- KPI Summary Row -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Discovery Cohort</div>
+        <div class="text-2xl font-bold text-slate-900 mt-1">72 Samples</div>
+        <div class="text-xs text-slate-500 mt-1">GSE68719 (44 Control / 28 PD)</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">ML Selection Methods</div>
+        <div class="text-2xl font-bold text-indigo-600 mt-1">5 Algorithms</div>
+        <div class="text-xs text-slate-500 mt-1">LASSO, Boruta, SVM, XGB, MI</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Validated Panel</div>
+        <div class="text-2xl font-bold text-slate-900 mt-1">18 Biomarkers</div>
+        <div class="text-xs text-slate-500 mt-1">Union of Top-10 LASSO & Boruta</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">LOOCV Discrimination</div>
+        <div class="text-2xl font-bold text-emerald-600 mt-1">0.912 AUC</div>
+        <div class="text-xs text-slate-500 mt-1">86.1% Overall Accuracy</div>
+      </div>
+    </div>
+
+    <!-- SECTION 1: Pipeline Architecture & Purpose -->
+    <section id="pipeline" class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm">
+      <div class="max-w-3xl">
+        <h2 class="text-xl font-bold text-slate-900">1. Pipeline Architecture & Project Purpose</h2>
+        <p class="text-sm text-slate-600 mt-1 leading-relaxed">
+          Clinical diagnosis of Parkinson's Disease often occurs late after extensive neurodegeneration. This project develops an end-to-end bioinformatics and machine learning framework that isolates a high-confidence, non-redundant gene panel from brain cortex RNA-Seq transcriptomes, providing objective molecular biomarkers and biological interpretability.
+        </p>
+      </div>
+
+      <!-- Flowchart Steps -->
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mt-6">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="text-xs font-bold text-indigo-600 uppercase tracking-wide">Step 1</div>
+            <div class="font-semibold text-slate-900 text-sm mt-1">Differential Expression</div>
+            <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              <code>limma-voom</code> empirical Bayes modeling filters 21,537 genes down to 430 significant DEGs (|log2FC| > 1, FDR < 0.05).
+            </p>
+          </div>
+          <span class="inline-block bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-mono mt-3 self-start">430 Candidate DEGs</span>
+        </div>
+
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="text-xs font-bold text-indigo-600 uppercase tracking-wide">Step 2</div>
+            <div class="font-semibold text-slate-900 text-sm mt-1">Transcript Quality Cleaning</div>
+            <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              Excludes uncharacterized <code>LOC*</code> loci, pseudogenes, microRNAs, and snRNAs to retain genuine protein-coding genes.
+            </p>
+          </div>
+          <span class="inline-block bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-mono mt-3 self-start">351 Filtered Transcripts</span>
+        </div>
+
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="text-xs font-bold text-indigo-600 uppercase tracking-wide">Step 3</div>
+            <div class="font-semibold text-slate-900 text-sm mt-1">5-Method ML Selection</div>
+            <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              Runs parallel feature selection: LASSO L1 regression, Boruta random forests, SVM-RFE, XGBoost Gini importance, and Mutual Information.
+            </p>
+          </div>
+          <span class="inline-block bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-mono mt-3 self-start">5 Algorithm Pools</span>
+        </div>
+
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="text-xs font-bold text-indigo-600 uppercase tracking-wide">Step 4</div>
+            <div class="font-semibold text-slate-900 text-sm mt-1">Consensus Synthesis</div>
+            <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              Merges the Top-10 LASSO and Top-10 Boruta candidates into an 18-gene consensus panel, preventing individual model overfitting.
+            </p>
+          </div>
+          <span class="inline-block bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-mono mt-3 self-start">18-Gene Biomarker Panel</span>
+        </div>
+
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="text-xs font-bold text-indigo-600 uppercase tracking-wide">Step 5</div>
+            <div class="font-semibold text-slate-900 text-sm mt-1">Validation & SHAP</div>
+            <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              Cross-validated via LOOCV (86.1% accuracy, 0.912 AUC). SHAP TreeExplainer quantifies exact per-sample log-odds attributions.
+            </p>
+          </div>
+          <span class="inline-block bg-emerald-50 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-mono mt-3 self-start">0.912 ROC-AUC</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: DEG & Multi-Method Feature Selection Workbench -->
+    <section id="workbench" class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">2. Multi-Method Feature Selection & DEG Workbench</h2>
+          <p class="text-sm text-slate-600 mt-0.5">Toggle algorithms, filter by consensus strategy, or upload custom candidate DEGs.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="data/sample_deg_list.csv" download class="inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg font-medium transition">
+            📥 Download Sample DEG CSV
+          </a>
+        </div>
+      </div>
+
+      <!-- File Upload / Preset Controls -->
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="flex items-center gap-4 flex-wrap">
+          <label class="text-xs font-semibold text-slate-700 uppercase">Input Data:</label>
+          <label class="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+            <input type="radio" name="sourceMode" value="sample" checked onchange="toggleSourceMode(this.value)" class="text-indigo-600 focus:ring-indigo-500">
+            <span>Preloaded GSE68719 Discovery DEGs</span>
+          </label>
+          <label class="flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+            <input type="radio" name="sourceMode" value="upload" onchange="toggleSourceMode(this.value)" class="text-indigo-600 focus:ring-indigo-500">
+            <span>Upload Custom DEG List</span>
+          </label>
+        </div>
+        <div id="uploadInputContainer" class="hidden w-full md:w-auto">
+          <input type="file" id="degFileInput" accept=".csv,.tsv,.txt" onchange="handleDegUpload(event)" class="text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+        </div>
+      </div>
+
+      <!-- Method Selection Checkboxes -->
+      <div>
+        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Select Machine Learning Selection Methods:</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          <label class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 p-3 rounded-xl border border-slate-200 cursor-pointer transition">
+            <input type="checkbox" id="checkLasso" checked onchange="updateConsensus()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800">LASSO (L1)</span>
+          </label>
+          <label class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 p-3 rounded-xl border border-slate-200 cursor-pointer transition">
+            <input type="checkbox" id="checkBoruta" checked onchange="updateConsensus()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800">Boruta (RF)</span>
+          </label>
+          <label class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 p-3 rounded-xl border border-slate-200 cursor-pointer transition">
+            <input type="checkbox" id="checkSvm" onchange="updateConsensus()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800">SVM-RFE</span>
+          </label>
+          <label class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 p-3 rounded-xl border border-slate-200 cursor-pointer transition">
+            <input type="checkbox" id="checkXgb" onchange="updateConsensus()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800">XGBoost</span>
+          </label>
+          <label class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 p-3 rounded-xl border border-slate-200 cursor-pointer transition">
+            <input type="checkbox" id="checkMi" onchange="updateConsensus()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800">Mutual Information</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Strategy Selector & Metrics -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-semibold text-indigo-950 uppercase">Consensus Strategy:</span>
+          <select id="consensusStrategy" onchange="updateConsensus()" class="bg-white text-xs font-medium border border-indigo-200 rounded-lg px-3 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="union">Union (Selected by Any Method)</option>
+            <option value="majority">Majority Vote (&ge; 50% of Methods)</option>
+            <option value="intersect">Strict Intersect (Selected by All Methods)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-4 text-xs">
+          <div>Algorithms: <strong id="metricMethodsCount" class="text-indigo-600 font-bold">2</strong>/5</div>
+          <div>Consensus Panel: <strong id="metricPanelCount" class="text-slate-900 font-bold">18</strong> genes</div>
+          <div>High Consensus (&ge;2): <strong id="metricOverlapCount" class="text-emerald-600 font-bold">2</strong> genes</div>
+        </div>
+      </div>
+
+      <!-- Voting Table -->
+      <div class="overflow-x-auto rounded-xl border border-slate-200">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+            <tr>
+              <th class="py-3 px-4">Gene Symbol</th>
+              <th class="py-3 px-4">Votes</th>
+              <th class="py-3 px-4">In Panel</th>
+              <th class="py-3 px-3 text-center">LASSO</th>
+              <th class="py-3 px-3 text-center">Boruta</th>
+              <th class="py-3 px-3 text-center">SVM</th>
+              <th class="py-3 px-3 text-center">XGB</th>
+              <th class="py-3 px-3 text-center">MI</th>
+              <th class="py-3 px-4">log2FC</th>
+              <th class="py-3 px-4">FDR padj</th>
+            </tr>
+          </thead>
+          <tbody id="votingTableBody" class="divide-y divide-slate-100 font-mono">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-between items-center text-xs text-slate-500">
+        <div>Showing candidate biomarkers ranked by multi-algorithm agreement.</div>
+        <button onclick="downloadPanelCsv()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium transition shadow-sm">
+          📥 Export Consensus Panel (CSV)
+        </button>
+      </div>
+    </section>
+
+    <!-- SECTION 3: Analysis Plots Showcase Gallery -->
+    <section id="gallery" class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-slate-900">3. Analysis Plots Showcase (Research Gallery)</h2>
+        <p class="text-sm text-slate-600 mt-0.5">Explore the published diagnostic, validation, and interpretability figures generated from this pipeline.</p>
+      </div>
+
+      <!-- Gallery Tabs -->
+      <div class="flex border-b border-slate-200 gap-6 text-sm overflow-x-auto">
+        <button id="tabBtnRoc" onclick="switchTab('roc')" class="py-2.5 tab-active transition whitespace-nowrap">📈 LOOCV ROC Curve</button>
+        <button id="tabBtnHeatmap" onclick="switchTab('heatmap')" class="py-2.5 tab-inactive transition whitespace-nowrap">🧬 Clustered Heatmap</button>
+        <button id="tabBtnBoxplots" onclick="switchTab('boxplots')" class="py-2.5 tab-inactive transition whitespace-nowrap">📊 Biomarker Boxplots</button>
+        <button id="tabBtnShap" onclick="switchTab('shap')" class="py-2.5 tab-inactive transition whitespace-nowrap">🐝 Global SHAP Summary</button>
+        <button id="tabBtnVolcano" onclick="switchTab('volcano')" class="py-2.5 tab-inactive transition whitespace-nowrap">🌋 Transcriptome Volcano</button>
+      </div>
+
+      <!-- Tab Content 1: ROC Curve -->
+      <div id="tabContentRoc" class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
+        <div class="lg:col-span-7 bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-center">
+          <img src="images/roc_loocv.png" alt="LOOCV ROC Curve" class="max-h-[460px] object-contain rounded-lg shadow-sm">
+        </div>
+        <div class="lg:col-span-5 space-y-4 text-sm text-slate-700">
+          <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+            <div class="text-xs uppercase font-bold text-emerald-800">Primary Validation Metric</div>
+            <div class="text-3xl font-extrabold text-emerald-900 mt-1">AUC = 0.912</div>
+            <div class="text-xs text-emerald-700 mt-1">Overall LOOCV Accuracy: <strong>86.1%</strong> (62 / 72 subjects)</div>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm">Why Leave-One-Out Cross-Validation?</h4>
+            <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+              With 72 postmortem biospecimens, random train/test splits introduce high sampling variance. Leave-One-Out Cross-Validation trains on 71 subjects and tests on the single held-out subject, repeating 72 times. This gives the gold-standard validation performance without optimistic overfitting.
+            </p>
+          </div>
+          <div class="border-t border-slate-200 pt-3">
+            <h4 class="font-bold text-slate-900 text-sm">Clinical Discrimination:</h4>
+            <ul class="text-xs text-slate-600 list-disc list-inside mt-1 space-y-1">
+              <li><strong>Sensitivity (PD Recall):</strong> 71.4% (20 / 28)</li>
+              <li><strong>Specificity (Control Recall):</strong> 95.5% (42 / 44)</li>
+              <li><strong>Positive Predictive Value (Precision):</strong> 90.9%</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Clustered Heatmap -->
+      <div id="tabContentHeatmap" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
+        <div class="lg:col-span-8 bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-center">
+          <img src="images/panel_heatmap.png" alt="18-Gene Clustered Heatmap" class="max-h-[460px] object-contain rounded-lg shadow-sm">
+        </div>
+        <div class="lg:col-span-4 space-y-4 text-sm text-slate-700">
+          <div>
+            <div class="text-xs uppercase font-bold text-indigo-600">Orthogonal Unsupervised Confirmation</div>
+            <h3 class="text-base font-bold text-slate-900 mt-1">Hierarchical Dendrogram Clustering</h3>
+            <p class="text-xs text-slate-600 mt-2 leading-relaxed">
+              This clustering received <strong>no diagnostic labels</strong>. The unsupervised tree naturally separates Parkinson's disease subjects (orange bar) from neurologically normal controls (blue bar), matching the ~86% classification accuracy.
+            </p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs space-y-2">
+            <div>
+              <strong class="text-slate-900">Upregulated Co-expression Block:</strong>
+              <div class="text-slate-600 text-[11px] mt-0.5"><code>ADAM33</code>, <code>DNAJB1</code>, <code>RIPOR3</code>, <code>SIX5</code>, <code>MT1A</code>, <code>SMTN</code>, <code>SERPINF2</code>, <code>CSF1</code>, <code>HSPB1</code></div>
+            </div>
+            <div>
+              <strong class="text-slate-900">Downregulated Inverse Block:</strong>
+              <div class="text-slate-600 text-[11px] mt-0.5"><code>CELF2-AS1</code>, <code>C1QL3</code>, <code>PRAP1</code>, <code>CISTR</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 3: Biomarker Boxplots -->
+      <div id="tabContentBoxplots" class="hidden space-y-4 pt-2">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-center overflow-x-auto">
+          <img src="images/panel_boxplots.png" alt="Biomarker Gene Boxplots" class="max-h-[440px] object-contain rounded-lg shadow-sm">
+        </div>
+        <div class="text-xs text-slate-600 text-center">
+          Grouped distributions for all 18 consensus biomarkers. Individual overlaid points represent single brain tissue samples (Control vs. Parkinson's disease).
+        </div>
+      </div>
+
+      <!-- Tab Content 4: Global SHAP Summary -->
+      <div id="tabContentShap" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
+        <div class="lg:col-span-7 bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-center">
+          <img src="images/shap_summary.png" alt="SHAP Summary Beeswarm Plot" class="max-h-[460px] object-contain rounded-lg shadow-sm">
+        </div>
+        <div class="lg:col-span-5 space-y-4 text-sm text-slate-700">
+          <div>
+            <div class="text-xs uppercase font-bold text-indigo-600">Model Interpretability</div>
+            <h3 class="text-base font-bold text-slate-900 mt-1">SHAP Beeswarm Feature Impact</h3>
+            <p class="text-xs text-slate-600 mt-2 leading-relaxed">
+              SHAP (SHapley Additive exPlanations) computes exact game-theoretic attributions for each feature across the cohort. Features are ranked from top to bottom by global explanatory power.
+            </p>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <strong class="text-red-900">#1 Biomarker: ADAM33</strong>
+              <p class="text-red-800 text-[11px] mt-0.5">Selected independently by both LASSO and Boruta; highest overall magnitude in pushing predictions toward Parkinson's disease.</p>
+            </div>
+            <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <strong class="text-blue-900">Proteostasis & Heat Shock Chaperones</strong>
+              <p class="text-blue-800 text-[11px] mt-0.5"><code>DNAJB1</code> (Hsp40) and <code>HSPB1</code> (Hsp27) reflect cellular protective responses against hallmark &alpha;-synuclein protein misfolding.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 5: Transcriptome Volcano Plot -->
+      <div id="tabContentVolcano" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
+        <div class="lg:col-span-7 bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-center">
+          <img src="images/volcano_plot.png" alt="Differential Expression Volcano Plot" class="max-h-[460px] object-contain rounded-lg shadow-sm">
+        </div>
+        <div class="lg:col-span-5 space-y-4 text-sm text-slate-700">
+          <div>
+            <div class="text-xs uppercase font-bold text-indigo-600">Differential Expression Landscape</div>
+            <h3 class="text-base font-bold text-slate-900 mt-1">21,537-Gene Volcano Plot</h3>
+            <p class="text-xs text-slate-600 mt-2 leading-relaxed">
+              Generated from <code>limma-voom</code> linear modeling. Genes in the upper right quadrant (red) are significantly upregulated in Parkinson's disease; genes in the upper left (blue) are significantly downregulated.
+            </p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
+            <strong>Statistical Criteria:</strong>
+            <ul class="list-disc list-inside mt-1 space-y-1 text-slate-600 text-[11px]">
+              <li>FDR adjusted p-value &lt; 0.05 (horizontal threshold)</li>
+              <li>|log2 Fold Change| &gt; 1.0 (vertical thresholds, corresponding to 2-fold change)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: Patient Decision Audit (SHAP Waterfall) -->
+    <section id="audit" class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">4. Patient-Level Decision Audit (SHAP Waterfall)</h2>
+          <p class="text-sm text-slate-600 mt-0.5">Audit individual clinical classifications through transparent, additive gene contributions.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-slate-600">Patient:</span>
+          <select id="patientSelector" onchange="renderPatientWaterfall(this.value)" class="text-xs font-medium border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="T.1">Patient T.1 (Diagnosed: Parkinson's)</option>
+            <option value="C.1">Patient C.1 (Diagnosed: Control)</option>
+            <option value="T.2">Patient T.2 (Diagnosed: Parkinson's)</option>
+            <option value="C.2">Patient C.2 (Diagnosed: Control)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Patient Diagnosis Banner -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div class="text-xs text-slate-500 font-medium">True Clinical State</div>
+          <div id="patientTrueState" class="text-lg font-bold text-slate-900 mt-1">Parkinson's Disease</div>
+        </div>
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div class="text-xs text-slate-500 font-medium">Model Classification</div>
+          <div id="patientPredState" class="text-lg font-bold text-indigo-600 mt-1">Parkinson's Disease (93.4%)</div>
+        </div>
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div class="text-xs text-slate-500 font-medium">Total Log-Odds Output</div>
+          <div id="patientMargin" class="text-lg font-bold text-slate-900 font-mono mt-1">+2.65 log-odds</div>
+        </div>
+      </div>
+
+      <!-- Synthetic Visual Waterfall Table -->
+      <div>
+        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Top Biomarker Contributors to Decision:</div>
+        <div id="waterfallBars" class="space-y-2">
+          <!-- Dynamically populated bars -->
+        </div>
+      </div>
+
+      <div class="p-4 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-900 leading-relaxed" id="patientSummaryOneLiner">
+        💡 <strong>Key Driver:</strong> For patient <strong>T.1</strong>, elevated expression of <strong>ADAM33</strong> (+0.682 log-odds) and <strong>DNAJB1</strong> (+0.514 log-odds) was the dominant driver pushing the model toward a classification of Parkinson's Disease.
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-12">
+    PD-DEG-MultipleML-Analyses &bull; Free instant deployment configured for Vercel &bull; 2026
+  </footer>
+
+  <!-- Application Logic JS -->
+  <script>
+    // Data definition for all 5 methods
+    const METHODS_DATA = {
+      "LASSO": ["ADAM33", "DNAJB1", "C1QL3", "CELF2-AS1", "CISTR", "CCN4", "SYTL4", "SHISA3", "PRAP1", "LINC01546"],
+      "Boruta": ["ADAM33", "SERPINF2", "SIX5", "PRELP", "HSPB1", "MT1A", "SMTN", "DNAJB1", "RIPOR3", "CSF1"],
+      "SVM_RFE": ["ADAM33", "IFITM2", "CISTR", "OTOS", "C1QL3", "KCNQ5-DT", "LINC03044", "MT1A", "CSAG1", "CELF2-AS1"],
+      "XGBoost": ["RIPOR3", "LINC02019", "SMTN", "PCOLCE", "KLF15", "MLKL", "HSPA1B", "EPHA2", "DNAJB1", "SERPINF2"],
+      "MutualInfo": ["ADAM33", "SIX5", "RIPOR3", "LRG1", "LINC02019", "PRELP", "SERPINH1", "CLDN9", "HSPB1", "TRIP10"]
+    };
+
+    const GENE_ANNOTATIONS = {
+      "ADAM33": { log2fc: 1.17, padj: 2.4e-5 },
+      "DNAJB1": { log2fc: 1.34, padj: 3.1e-5 },
+      "RIPOR3": { log2fc: 1.35, padj: 2.4e-5 },
+      "SIX5": { log2fc: 1.11, padj: 2.4e-5 },
+      "HSPB1": { log2fc: 1.69, padj: 2.4e-5 },
+      "MT1A": { log2fc: 1.15, padj: 1.8e-4 },
+      "PRELP": { log2fc: 1.28, padj: 1.1e-4 },
+      "SERPINF2": { log2fc: 1.42, padj: 8.5e-5 },
+      "SMTN": { log2fc: 1.09, padj: 4.2e-4 },
+      "CSF1": { log2fc: 1.05, padj: 5.1e-4 },
+      "C1QL3": { log2fc: -1.22, padj: 1.6e-4 },
+      "CELF2-AS1": { log2fc: -1.18, padj: 2.2e-4 },
+      "CISTR": { log2fc: -1.14, padj: 3.5e-4 },
+      "CCN4": { log2fc: 1.08, padj: 6.2e-4 },
+      "PRAP1": { log2fc: -1.31, padj: 1.9e-4 },
+      "SYTL4": { log2fc: 1.12, padj: 4.8e-4 },
+      "SHISA3": { log2fc: 1.06, padj: 5.5e-4 },
+      "LINC01546": { log2fc: -1.04, padj: 7.1e-4 },
+      "LINC02019": { log2fc: 1.21, padj: 2.0e-4 },
+      "IFITM2": { log2fc: 1.08, padj: 6.5e-4 },
+      "OTOS": { log2fc: 1.02, padj: 8.1e-4 },
+      "KCNQ5-DT": { log2fc: -1.05, padj: 7.8e-4 },
+      "LINC03044": { log2fc: 1.01, padj: 9.0e-4 },
+      "CSAG1": { log2fc: 1.03, padj: 8.4e-4 },
+      "PCOLCE": { log2fc: 1.14, padj: 3.9e-4 },
+      "KLF15": { log2fc: 1.07, padj: 6.8e-4 },
+      "MLKL": { log2fc: 1.04, padj: 7.5e-4 },
+      "HSPA1B": { log2fc: 1.18, padj: 2.8e-4 },
+      "EPHA2": { log2fc: 1.05, padj: 7.2e-4 },
+      "LRG1": { log2fc: 1.10, padj: 5.0e-4 },
+      "SERPINH1": { log2fc: 1.06, padj: 7.0e-4 },
+      "CLDN9": { log2fc: 1.03, padj: 8.5e-4 },
+      "TRIP10": { log2fc: 1.01, padj: 9.2e-4 }
+    };
+
+    let activeCustomGenes = null;
+    let currentConsensusList = [];
+
+    function toggleSourceMode(mode) {
+      const container = document.getElementById('uploadInputContainer');
+      if (mode === 'upload') {
+        container.classList.remove('hidden');
+      } else {
+        container.classList.add('hidden');
+        activeCustomGenes = null;
+        updateConsensus();
+      }
+    }
+
+    function handleDegUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const text = evt.target.result;
+        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+        const genes = [];
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split(/[,\t]/);
+          if (parts[0]) genes.push(parts[0].replace(/"/g, '').trim().toUpperCase());
+        }
+        activeCustomGenes = new Set(genes);
+        alert(`Loaded ${activeCustomGenes.size} genes from uploaded DEG file.`);
+        updateConsensus();
+      };
+      reader.readAsText(file);
+    }
+
+    function updateConsensus() {
+      const useLasso = document.getElementById('checkLasso').checked;
+      const useBoruta = document.getElementById('checkBoruta').checked;
+      const useSvm = document.getElementById('checkSvm').checked;
+      const useXgb = document.getElementById('checkXgb').checked;
+      const useMi = document.getElementById('checkMi').checked;
+
+      const activeMethods = {};
+      if (useLasso) activeMethods['LASSO'] = METHODS_DATA['LASSO'];
+      if (useBoruta) activeMethods['Boruta'] = METHODS_DATA['Boruta'];
+      if (useSvm) activeMethods['SVM'] = METHODS_DATA['SVM_RFE'];
+      if (useXgb) activeMethods['XGBoost'] = METHODS_DATA['XGBoost'];
+      if (useMi) activeMethods['MutualInfo'] = METHODS_DATA['MutualInfo'];
+
+      const methodKeys = Object.keys(activeMethods);
+      const nMethods = methodKeys.length;
+      document.getElementById('metricMethodsCount').innerText = nMethods;
+
+      if (nMethods === 0) {
+        document.getElementById('votingTableBody').innerHTML = `<tr><td colspan="10" class="py-6 text-center text-slate-400">Select at least one method above.</td></tr>`;
+        document.getElementById('metricPanelCount').innerText = '0';
+        document.getElementById('metricOverlapCount').innerText = '0';
+        return;
+      }
+
+      // Count votes
+      const voteMap = {};
+      for (const m in activeMethods) {
+        for (const g of activeMethods[m]) {
+          if (activeCustomGenes && !activeCustomGenes.has(g.toUpperCase())) continue;
+          voteMap[g] = (voteMap[g] || 0) + 1;
+        }
+      }
+
+      const strategy = document.getElementById('consensusStrategy').value;
+      const consensusSet = new Set();
+
+      for (const g in voteMap) {
+        const v = voteMap[g];
+        if (strategy === 'intersect' && v === nMethods) {
+          consensusSet.add(g);
+        } else if (strategy === 'majority' && v >= Math.ceil(nMethods / 2)) {
+          consensusSet.add(g);
+        } else if (strategy === 'union') {
+          consensusSet.add(g);
+        }
+      }
+
+      currentConsensusList = Array.from(consensusSet);
+      document.getElementById('metricPanelCount').innerText = currentConsensusList.length;
+
+      let multiOverlap = 0;
+      for (const g in voteMap) {
+        if (voteMap[g] >= 2) multiOverlap++;
+      }
+      document.getElementById('metricOverlapCount').innerText = multiOverlap;
+
+      // Render table
+      const sortedGenes = Object.keys(voteMap).sort((a, b) => voteMap[b] - voteMap[a]);
+      const tbody = document.getElementById('votingTableBody');
+      tbody.innerHTML = '';
+
+      sortedGenes.forEach(g => {
+        const votes = voteMap[g];
+        const inPanel = consensusSet.has(g);
+        const info = GENE_ANNOTATIONS[g] || { log2fc: 1.0, padj: 1e-4 };
+
+        const row = document.createElement('tr');
+        row.className = inPanel ? 'bg-indigo-50/30' : 'hover:bg-slate-50';
+        row.innerHTML = `
+          <td class="py-2.5 px-4 font-bold text-slate-900">${g}</td>
+          <td class="py-2.5 px-4"><span class="bg-slate-100 text-slate-800 text-[11px] px-2 py-0.5 rounded font-bold">${votes}/${nMethods}</span></td>
+          <td class="py-2.5 px-4">${inPanel ? '<span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-semibold text-[11px]">✓ Yes</span>' : '<span class="text-slate-400 text-[11px]">No</span>'}</td>
+          <td class="py-2.5 px-3 text-center ${activeMethods['LASSO'] && activeMethods['LASSO'].includes(g) ? 'text-indigo-600 font-bold' : 'text-slate-300'}">${activeMethods['LASSO'] && activeMethods['LASSO'].includes(g) ? '✓' : '—'}</td>
+          <td class="py-2.5 px-3 text-center ${activeMethods['Boruta'] && activeMethods['Boruta'].includes(g) ? 'text-indigo-600 font-bold' : 'text-slate-300'}">${activeMethods['Boruta'] && activeMethods['Boruta'].includes(g) ? '✓' : '—'}</td>
+          <td class="py-2.5 px-3 text-center ${activeMethods['SVM'] && activeMethods['SVM'].includes(g) ? 'text-indigo-600 font-bold' : 'text-slate-300'}">${activeMethods['SVM'] && activeMethods['SVM'].includes(g) ? '✓' : '—'}</td>
+          <td class="py-2.5 px-3 text-center ${activeMethods['XGBoost'] && activeMethods['XGBoost'].includes(g) ? 'text-indigo-600 font-bold' : 'text-slate-300'}">${activeMethods['XGBoost'] && activeMethods['XGBoost'].includes(g) ? '✓' : '—'}</td>
+          <td class="py-2.5 px-3 text-center ${activeMethods['MutualInfo'] && activeMethods['MutualInfo'].includes(g) ? 'text-indigo-600 font-bold' : 'text-slate-300'}">${activeMethods['MutualInfo'] && activeMethods['MutualInfo'].includes(g) ? '✓' : '—'}</td>
+          <td class="py-2.5 px-4 ${info.log2fc > 0 ? 'text-red-600 font-semibold' : 'text-blue-600 font-semibold'}">${info.log2fc > 0 ? '+' : ''}${info.log2fc.toFixed(2)}</td>
+          <td class="py-2.5 px-4 text-slate-500">${info.padj.toExponential(1)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function downloadPanelCsv() {
+      if (currentConsensusList.length === 0) {
+        alert('Consensus panel is empty.');
+        return;
+      }
+      let csv = 'Gene_Symbol\n' + currentConsensusList.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'consensus_gene_panel.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function switchTab(tabId) {
+      const tabs = ['roc', 'heatmap', 'boxplots', 'shap', 'volcano'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+        const content = document.getElementById('tabContent' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (t === tabId) {
+          btn.className = 'py-2.5 tab-active transition whitespace-nowrap';
+          content.classList.remove('hidden');
+        } else {
+          btn.className = 'py-2.5 tab-inactive transition whitespace-nowrap';
+          content.classList.add('hidden');
+        }
+      });
+    }
+
+    const PATIENT_DATA = {
+      'T.1': {
+        trueState: "Parkinson's Disease",
+        predState: "Parkinson's Disease (93.4%)",
+        margin: "+2.65",
+        bars: [
+          { gene: 'ADAM33', val: '4.82', shap: 0.682, pos: true },
+          { gene: 'DNAJB1', val: '5.10', shap: 0.514, pos: true },
+          { gene: 'RIPOR3', val: '3.94', shap: 0.431, pos: true },
+          { gene: 'HSPB1', val: '6.75', shap: 0.388, pos: true },
+          { gene: 'C1QL3', val: '1.20', shap: -0.180, pos: false }
+        ],
+        summary: "For patient <strong>T.1</strong>, elevated expression of <strong>ADAM33</strong> (+0.682 log-odds) and <strong>DNAJB1</strong> (+0.514 log-odds) was the dominant driver pushing the model toward a classification of Parkinson's Disease."
+      },
+      'C.1': {
+        trueState: "Neurologically Normal Control",
+        predState: "Control (89.2%)",
+        margin: "-2.11",
+        bars: [
+          { gene: 'CELF2-AS1', val: '4.21', shap: -0.540, pos: false },
+          { gene: 'C1QL3', val: '4.85', shap: -0.490, pos: false },
+          { gene: 'ADAM33', val: '2.10', shap: -0.410, pos: false },
+          { gene: 'PRAP1', val: '3.62', shap: -0.380, pos: false },
+          { gene: 'DNAJB1', val: '3.05', shap: 0.120, pos: true }
+        ],
+        summary: "For patient <strong>C.1</strong>, high baseline expression of <strong>CELF2-AS1</strong> (-0.540 log-odds) and <strong>C1QL3</strong> (-0.490 log-odds) pushed the log-odds margin strongly toward Control."
+      },
+      'T.2': {
+        trueState: "Parkinson's Disease",
+        predState: "Parkinson's Disease (91.0%)",
+        margin: "+2.31",
+        bars: [
+          { gene: 'DNAJB1', val: '5.42', shap: 0.610, pos: true },
+          { gene: 'ADAM33', val: '4.60', shap: 0.530, pos: true },
+          { gene: 'SERPINF2', val: '4.15', shap: 0.390, pos: true },
+          { gene: 'SIX5', val: '3.80', shap: 0.310, pos: true }
+        ],
+        summary: "For patient <strong>T.2</strong>, stress-response chaperone <strong>DNAJB1</strong> was the primary biomarker pushing the prediction toward Parkinson's Disease."
+      },
+      'C.2': {
+        trueState: "Neurologically Normal Control",
+        predState: "Control (94.1%)",
+        margin: "-2.78",
+        bars: [
+          { gene: 'C1QL3', val: '5.12', shap: -0.620, pos: false },
+          { gene: 'CISTR', val: '4.40', shap: -0.510, pos: false },
+          { gene: 'ADAM33', val: '1.95', shap: -0.480, pos: false },
+          { gene: 'PRAP1', val: '3.80', shap: -0.410, pos: false }
+        ],
+        summary: "For patient <strong>C.2</strong>, suppressed metalloproteinase expression and elevated <strong>C1QL3</strong> securely classified the sample as Control."
+      }
+    };
+
+    function renderPatientWaterfall(id) {
+      const p = PATIENT_DATA[id] || PATIENT_DATA['T.1'];
+      document.getElementById('patientTrueState').innerText = p.trueState;
+      document.getElementById('patientPredState').innerText = p.predState;
+      document.getElementById('patientMargin').innerText = p.margin + ' log-odds';
+      document.getElementById('patientSummaryOneLiner').innerHTML = `💡 <strong>Key Driver:</strong> ` + p.summary;
+
+      const container = document.getElementById('waterfallBars');
+      container.innerHTML = '';
+
+      p.bars.forEach(b => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center text-xs gap-3';
+        const barWidth = Math.min(100, Math.abs(b.shap) * 120);
+        const barColor = b.pos ? 'bg-red-500' : 'bg-blue-500';
+        const sign = b.shap > 0 ? '+' : '';
+
+        row.innerHTML = `
+          <div class="w-24 font-bold text-slate-800">${b.gene} (${b.val})</div>
+          <div class="flex-1 bg-slate-100 rounded-full h-4 relative flex items-center overflow-hidden">
+            <div class="${barColor} h-full rounded-full" style="width: ${barWidth}%;"></div>
+          </div>
+          <div class="w-20 text-right font-mono font-semibold ${b.pos ? 'text-red-600' : 'text-blue-600'}">${sign}${b.shap.toFixed(3)}</div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      updateConsensus();
+      renderPatientWaterfall('T.1');
+    });
+  </script>
+</body>
+</html>

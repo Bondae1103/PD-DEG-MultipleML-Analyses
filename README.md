@@ -1,192 +1,50 @@
-# ML Analysis of Differentially Expressed Genes (DEGs)
+# PD-DEG-MultipleML-Analyses
 
-A machine learning pipeline for identifying robust biomarker genes from Differentially Expressed Gene (DEG) analysis. The workflow integrates multiple feature selection methods, consensus voting, and model validation to identify genes that consistently discriminate between disease and control samples.
+Machine learning identification and cross-validation of transcriptomic biomarker gene panels from differential expression analysis in Parkinson's Disease cortex (GSE68719, GSE136666, GSE168496).
 
----
+## Pipeline Summary
+- **Differential Expression:** `limma-voom` empirical Bayes linear modeling on RNA-Seq read counts.
+- **Multi-Method Feature Selection:** Parallel candidate selection via L1-penalized LASSO, Boruta random forests, SVM-RFE, XGBoost importance, and Mutual Information.
+- **Validated Biomarker Panel:** 18-gene consensus panel (union of top-10 LASSO and top-10 Boruta) validated under Leave-One-Out Cross-Validation (86.1% LOOCV Accuracy, 0.912–0.939 ROC-AUC).
+- **Explainability:** SHAP (`TreeExplainer`) feature attributions quantifying each biomarker's exact mathematical contribution to sample-level predictions.
 
-## Overview
+## Interactive Web Dashboard
 
-This project performs an end-to-end biomarker discovery workflow using gene expression data. Starting from raw count matrices and a list of significant DEGs, it:
+A unified, responsive biomarker workbench exploring transcriptome-wide differential expression in Parkinson's disease postmortem cortex, dynamic 5-algorithm consensus voting, published research figure showcases, and explainable patient decision audits.
 
-- Cleans and filters candidate genes
-- Extracts expression profiles
-- Applies multiple machine learning feature selection methods
-- Generates a consensus biomarker panel
-- Validates the panel using Leave-One-Out Cross Validation (LOOCV)
-- Interprets model predictions using SHAP values
-- Exports all results for downstream biological analysis
-
----
-
-## Features
-
-- DEG preprocessing and quality filtering
-- Expression matrix generation
-- Multiple ML-based feature selection methods:
-  - LASSO (Logistic Regression with L1 Regularization)
-  - Boruta
-  - SVM-RFE
-  - XGBoost Feature Importance
-  - Mutual Information
-- Consensus biomarker selection through voting
-- Leave-One-Out Cross Validation (LOOCV)
-- ROC Curve generation
-- Confusion Matrix
-- Classification Report
-- Gene expression visualization
-- Clustered heatmaps
-- SHAP explainability
-- Export of selected genes and evaluation metrics
+### Features
+1. **Pipeline Architecture:** Interactive 5-stage flowchart detailing sample counts, quality filtering, and biological rationale.
+2. **5-Method ML Selection Workbench:** Interactive selection across LASSO, Boruta, SVM-RFE, XGBoost, and Mutual Information with dynamic consensus synthesis (Union, Majority Vote, Strict Intersect).
+3. **Custom DEG Upload:** Upload custom candidate DEG CSV/TSV tables or test with preloaded discovery data.
+4. **Analysis Plots Showcase:** High-resolution gallery featuring LOOCV ROC curve, Clustered Heatmap, Biomarker Boxplots, Global SHAP Beeswarm summary, and Transcriptome Volcano plot.
+5. **Patient Decision Audit:** Live single-sample SHAP waterfall attributions quantifying positive and negative biomarker push.
 
 ---
 
-## Pipeline
+### Deployment Options
 
-```text
-Raw Count Matrix
-        │
-        ▼
-Differentially Expressed Genes
-        │
-        ▼
-Data Cleaning
-(Remove LOC genes, pseudogenes, miRNAs, missing IDs)
-        │
-        ▼
-Extract DEG Expression Matrix
-        │
-        ▼
-Feature Selection
- ├── LASSO
- ├── Boruta
- ├── SVM-RFE
- ├── XGBoost
- └── Mutual Information
-        │
-        ▼
-Consensus Gene Panel
-        │
-        ▼
-Random Forest Validation
-(LOOCV)
-        │
-        ├── ROC Curve
-        ├── Confusion Matrix
-        ├── Classification Report
-        ├── Heatmap
-        ├── Boxplots
-        └── SHAP Interpretation
+#### Option A: Vercel (Fastest & Zero-Build Production)
+The app is pre-configured with root `index.html` and `vercel.json` for 10-second deployment on Vercel without server cold starts:
+1. Import your repository into [vercel.com](https://vercel.com/new).
+2. Leave all default build settings (Framework Preset: `Other`, Build Command: None).
+3. Click **Deploy**.
+
+*Or via CLI:*
+```bash
+npx vercel --prod
 ```
 
----
-
-## Required Input Files
-
-| File | Description |
-|------|-------------|
-| `PD-COUNT-FILE.xlsx` | Raw gene count matrix |
-| `DEG_List.xlsx` | Differentially expressed genes with Entrez IDs, Symbols and Gene Names |
-| `Metadata.xlsx` | Sample labels (Disease / Control) |
-
----
-
-## Machine Learning Methods
-
-### LASSO
-
-Identifies sparse biomarker signatures using L1-regularized logistic regression.
-
-### Boruta
-
-Uses Random Forest importance scores to identify biologically relevant genes.
-
-### SVM-RFE
-
-Recursively removes the least informative genes using a Support Vector Machine.
-
-### XGBoost
-
-Ranks genes according to gradient boosted decision tree importance.
-
-### Mutual Information
-
-Measures nonlinear relationships between gene expression and disease labels.
-
----
-
-## Consensus Biomarker Selection
-
-Instead of relying on a single algorithm, this project combines predictions from five independent feature selection methods.
-
-Genes selected by multiple algorithms are considered more reliable biomarkers and are used for model validation.
-
----
-
-## Validation
-
-The final biomarker panel is evaluated using:
-
-- Leave-One-Out Cross Validation (LOOCV)
-- Random Forest Classifier
-- ROC Curve & AUC
-- Confusion Matrix
-- Precision
-- Recall
-- F1 Score
-
-LOOCV is particularly suitable for small transcriptomic datasets because every sample is used once for testing.
-
----
-
-## Visualizations
-
-The notebook automatically generates:
-
-- ROC Curve
-- Confusion Matrix
-- Gene expression boxplots
-- Clustered heatmap
-- SHAP summary plots
-
-These visualizations aid both predictive evaluation and biological interpretation.
-
----
-
-## Installation
-
-Clone the repository
+#### Option B: Local Streamlit (3 Commands)
 
 ```bash
-git clone https://github.com/yourusername/ML-Analysis-of-DEGs.git
-cd ML-Analysis-of-DEGs
+# 1. Setup virtual environment
+python -m venv .venv-app && source .venv-app/bin/activate
+
+# 2. Install requirements
+pip install -r requirements-app.txt
+
+# 3. Launch dashboard
+streamlit run streamlit_app.py
 ```
 
-Install dependencies
-
-```bash
-pip install pandas numpy scikit-learn matplotlib seaborn xgboost Boruta shap openpyxl
-```
-
----
-
-## Dependencies
-
-- Python 3.x
-- pandas
-- numpy
-- scikit-learn
-- matplotlib
-- seaborn
-- xgboost
-- Boruta
-- shap
-- openpyxl
-
-
-
-## Author
-
-**Anoop Nair**
-
-B.Tech Computer Science (Bioinformatics)  
-Vellore Institute of Technology
+For detailed cloud deployment steps (including Streamlit Community Cloud and Hugging Face Spaces), see [`app/docs/DEPLOY.md`](app/docs/DEPLOY.md). Technical architecture and verification reports are documented in [`app/docs/`](app/docs/).

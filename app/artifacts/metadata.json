@@ -1,0 +1,90 @@
+{
+  "pipeline_name": "PD-DEG-MultipleML-Analyses",
+  "created_at": "2026-09-28T22:30:00Z",
+  "random_seed": 123,
+  "class_map": {
+    "0": "NO_PD",
+    "1": "PD"
+  },
+  "positive_class": "PD",
+  "negative_class": "NO_PD",
+  "primary_panel_features": [
+    "PRAP1",
+    "CCN4",
+    "DNAJB1",
+    "SIX5",
+    "MT1A",
+    "ADAM33",
+    "CISTR",
+    "RIPOR3",
+    "SMTN",
+    "CSF1",
+    "SERPINF2",
+    "SYTL4",
+    "PRELP",
+    "HSPB1",
+    "CELF2-AS1",
+    "C1QL3",
+    "LINC01546",
+    "SHISA3"
+  ],
+  "primary_panel_count": 18,
+  "model_type": "XGBClassifier",
+  "hyperparameters": {
+    "n_estimators": 300,
+    "max_depth": 3,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "scale_pos_weight": 1.5714285714285714,
+    "eval_metric": "logloss",
+    "random_state": 123
+  },
+  "metrics": {
+    "loocv_accuracy": 0.8611111111111112,
+    "loocv_auc": 0.9391233766233766,
+    "notebook_rf_loocv_accuracy": 0.8611,
+    "notebook_rf_loocv_auc": 0.9115
+  },
+  "cohorts": {
+    "GSE68719": {
+      "display_name": "GSE68719 (Discovery / Prefrontal Cortex)",
+      "geo_accession": "GSE68719",
+      "tissue": "Human Postmortem Frontal Cortex (BA9)",
+      "platform": "Illumina HiSeq 2000",
+      "n_samples": 72,
+      "group_counts": {
+        "NO_PD": 44,
+        "PD": 28
+      },
+      "used_in_training": true,
+      "contrast": "Parkinsons disease vs Control (log2FC > 0 is elevated in PD)"
+    },
+    "GSE136666": {
+      "display_name": "GSE136666 (External Validation)",
+      "geo_accession": "GSE136666",
+      "tissue": "Human Postmortem Brain Tissue",
+      "platform": "Illumina NextSeq 500",
+      "n_samples": 16,
+      "group_counts": {
+        "NO_PD": 8,
+        "PD": 8
+      },
+      "used_in_training": false,
+      "contrast": "Parkinsons disease vs Control"
+    },
+    "GSE168496": {
+      "display_name": "GSE168496 (External Validation)",
+      "geo_accession": "GSE168496",
+      "tissue": "Human Postmortem Brain Tissue",
+      "platform": "Illumina NovaSeq 6000",
+      "n_samples": 16,
+      "group_counts": {
+        "NO_PD": 8,
+        "PD": 8
+      },
+      "used_in_training": false,
+      "contrast": "Parkinsons disease vs Control"
+    }
+  }
+}

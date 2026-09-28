@@ -1,0 +1,17 @@
+sample_id,group,split,held_out
+GSM4054763,NO_PD,test,True
+GSM4054764,NO_PD,test,True
+GSM4054765,NO_PD,test,True
+GSM4054766,NO_PD,test,True
+GSM4054767,NO_PD,test,True
+GSM4054768,PD,test,True
+GSM4054769,PD,test,True
+GSM4054770,PD,test,True
+GSM4054771,PD,test,True
+GSM4054772,PD,test,True
+GSM4054773,NO_PD,test,True
+GSM4054774,NO_PD,test,True
+GSM4054775,NO_PD,test,True
+GSM4054776,PD,test,True
+GSM4054777,PD,test,True
+GSM4054778,PD,test,True
