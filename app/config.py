@@ -1,3 +1,11 @@
+"""
+app/config.py
+-------------
+Single source of truth for paths, thresholds, seeds, method definitions,
+and display constants across the PD-DEG ML-Methods Dashboard.
+Follows Plan v2 Section 3.1.
+"""
+
 import os
 
 # Base directory for the app package
@@ -6,99 +14,84 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 # Directory containing persisted machine learning models, gene lists, and cohorts
 ARTIFACT_DIR = os.path.join(APP_DIR, "artifacts")
 
-# Path to the serialized XGBoost model in native JSON format
-MODEL_PATH = os.path.join(ARTIFACT_DIR, "model.json")
-
-# Path to the ordered JSON list of 18 biomarker gene symbols
-FEATURES_PATH = os.path.join(ARTIFACT_DIR, "feature_list.json")
-
-# Path to preprocessing parameters (feature medians, pseudocounts, ID maps)
-PREPROC_PATH = os.path.join(ARTIFACT_DIR, "preprocessing.json")
-
-# Path to the differential expression results table
-DEG_PATH = os.path.join(ARTIFACT_DIR, "deg_results.csv")
-
-# Path to pipeline metadata, provenance, and evaluation metrics
+# Bundled GSE68719 asset paths
+SAMPLE_DEG_PATH = os.path.join(ARTIFACT_DIR, "sample_deg_list.csv")
+COUNTS_MATRIX_PATH = os.path.join(ARTIFACT_DIR, "counts_matrix.parquet")
+SAMPLE_METADATA_PATH = os.path.join(ARTIFACT_DIR, "sample_metadata.csv")
 METADATA_PATH = os.path.join(ARTIFACT_DIR, "metadata.json")
 
-# Available cohorts catalog for exploratory analysis
-COHORTS = {
-    "GSE68719": {
-        "display_name": "GSE68719 — Prefrontal Cortex (Discovery)",
-        "matrix_path": os.path.join(ARTIFACT_DIR, "cohort_gse68719_normalized.parquet"),
-        "meta_path": os.path.join(ARTIFACT_DIR, "cohort_gse68719_meta.csv"),
-        "description": "Human postmortem frontal cortex (BA9); 72 samples (44 Control, 28 Parkinson's).",
-        "geo_accession": "GSE68719",
-        "tissue": "Frontal Cortex (BA9)",
-        "platform": "Illumina HiSeq 2000",
-        "n_samples": 72,
-        "group_counts": {"NO_PD": 44, "PD": 28},
-        "used_in_training": True,
-        "contrast": "Parkinson's Disease vs Control (log2FC > 0 is elevated in PD)"
+# GEO accession and dataset description
+GEO_ACCESSION = "GSE68719"
+DATASET_TITLE = "Human Postmortem Frontal Cortex (BA9) RNA-Seq"
+
+# Random seed matching the notebook exactly
+RANDOM_SEED = 123
+
+# Fixed order of feature selection methods (used for deterministic fallback ordering)
+METHOD_NAMES = ["LASSO", "SVM_RFE", "XGBoost", "MutualInfo", "Boruta"]
+
+# Descriptive labels and tooltips for each method
+METHOD_INFO = {
+    "LASSO": {
+        "title": "LASSO (L1 Regularization)",
+        "estimator": "LogisticRegressionCV(Cs=20, cv=5, penalty='l1', solver='liblinear')",
+        "metric": "Absolute coefficient (|coef|)",
+        "scaling_required": True,
+        "description": "L1-penalized sparse logistic regression shrinking non-informative gene weights to exactly zero."
     },
-    "GSE136666": {
-        "display_name": "GSE136666 — Brain Tissue (External Validation)",
-        "matrix_path": os.path.join(ARTIFACT_DIR, "cohort_gse136666_normalized.parquet"),
-        "meta_path": os.path.join(ARTIFACT_DIR, "cohort_gse136666_meta.csv"),
-        "description": "Independent human postmortem brain cohort; 16 samples (8 Control, 8 Parkinson's).",
-        "geo_accession": "GSE136666",
-        "tissue": "Brain Tissue",
-        "platform": "Illumina NextSeq 500",
-        "n_samples": 16,
-        "group_counts": {"NO_PD": 8, "PD": 8},
-        "used_in_training": False,
-        "contrast": "Parkinson's Disease vs Control"
+    "SVM_RFE": {
+        "title": "SVM-RFE (Recursive Feature Elimination)",
+        "estimator": "RFE(SVC(kernel='linear'), n_features_to_select=10)",
+        "metric": "Refit linear SVM |coef|",
+        "scaling_required": True,
+        "description": "Iteratively prunes lowest-weight genes using a linear support vector machine margin."
     },
-    "GSE168496": {
-        "display_name": "GSE168496 — Brain Tissue (External Validation)",
-        "matrix_path": os.path.join(ARTIFACT_DIR, "cohort_gse168496_normalized.parquet"),
-        "meta_path": os.path.join(ARTIFACT_DIR, "cohort_gse168496_meta.csv"),
-        "description": "Independent human postmortem brain cohort; 16 samples (8 Control, 8 Parkinson's).",
-        "geo_accession": "GSE168496",
-        "tissue": "Brain Tissue",
-        "platform": "Illumina NovaSeq 6000",
-        "n_samples": 16,
-        "group_counts": {"NO_PD": 8, "PD": 8},
-        "used_in_training": False,
-        "contrast": "Parkinson's Disease vs Control"
+    "XGBoost": {
+        "title": "XGBoost Importance",
+        "estimator": "XGBClassifier(n_estimators=300, max_depth=3, learning_rate=0.05)",
+        "metric": "Gini / Split Feature Importance",
+        "scaling_required": False,
+        "description": "Gradient-boosted decision trees measuring non-linear feature split gain."
+    },
+    "MutualInfo": {
+        "title": "Mutual Information",
+        "estimator": "mutual_info_classif(random_state=123)",
+        "metric": "Mutual Information score",
+        "scaling_required": False,
+        "description": "Non-parametric information-theoretic dependency score capturing non-linear relationships."
+    },
+    "Boruta": {
+        "title": "Boruta (All-Relevant Feature Selection)",
+        "estimator": "BorutaPy(RandomForestClassifier, max_iter=200)",
+        "metric": "Refit Random Forest Gini importance",
+        "scaling_required": False,
+        "description": "Compares real feature importance against permuted shadow features to retain all statistically relevant biomarkers."
     }
 }
 
 # Explicit class mapping from training LabelEncoder
 CLASS_MAP = {0: "NO_PD", 1: "PD"}
-
-# User-facing display string for the positive target class
 POSITIVE_LABEL_DISPLAY = "Parkinson's Disease (PD)"
 NEGATIVE_LABEL_DISPLAY = "Neurologically Normal Control (NO_PD)"
 
-# Default statistical thresholds matching the repository analysis
-DEFAULT_PVAL_THRESH = 0.05
-DEFAULT_LOG2FC_THRESH = 1.0
+# Constraints and upload thresholds
+MAX_UPLOAD_MB = 20
+MAX_DEG_ROWS = 5000
+MIN_DEG_ROWS_FOR_METHODS = 15
 
-# Upload constraints and validation limits
-MAX_UPLOAD_MB = 50
-MIN_FEATURE_COVERAGE = 0.80
-MAX_UPLOAD_SAMPLES = 2000
-
-# UI display budgets and limits
-TOP_N_SHAP = 15
-VOLCANO_LABEL_TOP_N = 10
-
-# Original random seed from the repository training pipeline
-RANDOM_SEED = 123
-
-# Standardized Plotly color palette across Volcano and SHAP
-COLOR_UP = "#D62728"        # Red for significantly up-regulated genes
-COLOR_DOWN = "#1F77B4"      # Blue for significantly down-regulated genes
-COLOR_NOT_SIG = "#BDBDBD"   # Neutral gray for non-significant genes
-COLOR_SHAP_POS = "#D62728"  # Red pushes toward positive class (PD)
-COLOR_SHAP_NEG = "#1F77B4"  # Blue pushes toward negative class (NO_PD)
+# Fallback DEG filter constants (Plan v2 Section 1.5 & Section 4.6)
+FALLBACK_FILTER_NAME = "Welch's t-test + BH-FDR (Approximate Filter)"
+FALLBACK_P_THRESH = 0.05
+FALLBACK_LFC_THRESH = 1.0
 
 # Session state keys for Streamlit reactive state management
-SS_DATA_SOURCE = "data_source"
-SS_ACTIVE_COHORT = "active_cohort"
-SS_UPLOAD_HASH = "upload_hash"
-SS_SELECTED_SAMPLE = "selected_sample"
-SS_P_THRESH = "p_thresh"
-SS_LFC_THRESH = "lfc_thresh"
-SS_USE_PADJ = "use_padj"
+SS_DATA_SOURCE = "data_source"               # "sample" | "upload_deg" | "upload_raw"
+SS_DEG_HASH = "deg_hash"                     # Content hash of DEG data
+SS_SELECTED_METHODS = "selected_methods"     # List of selected method names
+SS_ANALYSIS_READY = "analysis_ready"         # Bool flag indicating pipeline completion
+SS_RESULTS = "results"                       # Dict[str, MethodResult]
+SS_CONSENSUS = "consensus"                   # ConsensusResult
+SS_VALIDATION = "validation"                 # ValidationResult
+SS_CUSTOM_DEG_DF = "custom_deg_df"           # User-uploaded DEG table
+SS_RAW_COUNTS_DF = "raw_counts_df"           # User-uploaded raw counts
+SS_RAW_META_DF = "raw_meta_df"               # User-uploaded sample metadata

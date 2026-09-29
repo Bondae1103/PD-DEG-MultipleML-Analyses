@@ -1,253 +1,173 @@
+"""
+app/core/io.py
+--------------
+File ingestion and validation for custom DEG lists and optional raw counts/metadata.
+Follows Plan v2 Section 4.1. Contains zero Streamlit imports.
+"""
+
+import os
 import io
-import csv
-import gzip
-from dataclasses import dataclass, field
-from typing import List, Tuple, Union, Optional
 import pandas as pd
-import numpy as np
+from typing import Tuple, Union, BinaryIO
 
-from app.core import UserInputError
-from app.config import MAX_UPLOAD_SAMPLES, MIN_FEATURE_COVERAGE
+class UserInputError(Exception):
+    """Actionable validation error raised for malformed or missing user uploads."""
+    pass
 
-@dataclass
-class ValidationReport:
-    """Detailed summary of uploaded expression dataset quality and characteristics."""
-    n_samples: int
-    n_genes: int
-    coverage: float
-    matched_features: List[str]
-    missing_features: List[str]
-    duplicate_ids: List[str]
-    negative_values: bool
-    looks_like_raw_counts: bool
-    warnings: List[str] = field(default_factory=list)
-    orientation: str = "samples_x_genes"
-
-def load_matrix(file_or_path: Union[str, io.BytesIO]) -> pd.DataFrame:
+def load_deg_list(file_or_path: Union[str, bytes, BinaryIO, io.BytesIO, io.StringIO], max_rows: int = 5000) -> pd.DataFrame:
     """
-    Load an expression matrix from CSV, TSV, TXT, GZ, or Parquet.
-    Auto-detects delimiter and sets the first column as the index.
-    
-    Raises:
-        UserInputError: For non-numeric matrices, invalid formats, or exceeding sample limits.
+    Load and validate a candidate DEG table from CSV or Excel.
+    Requires ENTREZID, SYMBOL, and GENENAME columns (case-insensitive).
     """
-    df: Optional[pd.DataFrame] = None
-    filename = ""
-
-    if isinstance(file_or_path, str):
-        filename = file_or_path.lower()
-        if filename.endswith(".parquet"):
-            try:
-                df = pd.read_parquet(file_or_path)
-            except Exception as e:
-                raise UserInputError(f"Failed to read Parquet file: {str(e)}")
-        else:
-            with open(file_or_path, "rb") as f:
-                content = f.read()
-    else:
-        # File-like object (e.g. UploadedFile)
-        filename = getattr(file_or_path, "name", "upload.csv").lower()
-        if filename.endswith(".parquet"):
-            try:
-                df = pd.read_parquet(file_or_path)
-            except Exception as e:
-                raise UserInputError(f"Failed to read Parquet file: {str(e)}")
-        else:
-            file_or_path.seek(0)
-            content = file_or_path.read()
-
-    if df is None:
-        # Check gzip compression
-        if filename.endswith(".gz") or content[:2] == b"\x1f\x8b":
-            try:
-                content = gzip.decompress(content)
-            except Exception as e:
-                raise UserInputError(f"Failed to decompress gzip file: {str(e)}")
-
-        # Delimiter sniffing on first 4 KB
-        sample_bytes = content[:4096]
-        try:
-            sample_text = sample_bytes.decode("utf-8", errors="replace")
-            dialect = csv.Sniffer().sniff(sample_text, delimiters=",\t; ")
-            sep = dialect.delimiter
-        except Exception:
-            # Fallback heuristic: comma first, then tab
-            sample_str = sample_bytes.decode("utf-8", errors="ignore")
-            if "\t" in sample_str and sample_str.count("\t") > sample_str.count(","):
-                sep = "\t"
+    try:
+        if isinstance(file_or_path, str):
+            if file_or_path.endswith(".xlsx") or file_or_path.endswith(".xls"):
+                df = pd.read_excel(file_or_path)
             else:
-                sep = ","
-
-        try:
-            df = pd.read_csv(io.BytesIO(content), sep=sep, index_col=0)
-        except Exception as e:
-            raise UserInputError(f"Could not parse tabular file with delimiter '{sep}': {str(e)}")
+                # Sniff CSV vs TSV
+                df = pd.read_csv(file_or_path, sep=None, engine="python")
+        else:
+            # File-like or bytes object
+            # Check filename attribute if available
+            filename = getattr(file_or_path, "name", "").lower()
+            if filename.endswith(".xlsx") or filename.endswith(".xls"):
+                df = pd.read_excel(file_or_path)
+            else:
+                try:
+                    df = pd.read_csv(file_or_path, sep=None, engine="python")
+                except Exception:
+                    if hasattr(file_or_path, "seek"):
+                        file_or_path.seek(0)
+                    df = pd.read_excel(file_or_path)
+    except Exception as e:
+        raise UserInputError(f"Could not parse DEG file: {str(e)}. Please ensure it is a valid CSV or Excel file.")
 
     if df.empty:
-        raise UserInputError("The uploaded file contains no data.")
+        raise UserInputError("Uploaded DEG table is completely empty.")
 
-    # Guard against oversized matrices
-    if df.shape[0] > MAX_UPLOAD_SAMPLES and df.shape[1] > MAX_UPLOAD_SAMPLES:
-        raise UserInputError(
-            f"Uploaded matrix has {df.shape[0]} rows and {df.shape[1]} columns, exceeding the maximum allowed {MAX_UPLOAD_SAMPLES} samples."
-        )
+    # Standardize column names (case-insensitive match)
+    col_mapping = {}
+    required_cols = {"ENTREZID", "SYMBOL", "GENENAME"}
+    found_cols = set()
 
-    # Coerce to numeric
-    orig_cells = df.size
-    df_numeric = df.apply(pd.to_numeric, errors="coerce")
-    nan_cells = df_numeric.isna().sum().sum()
-    if orig_cells > 0 and (nan_cells / orig_cells) > 0.05:
-        raise UserInputError(
-            f"More than 5% ({nan_cells}/{orig_cells}) of matrix cells could not be converted to numeric values. Please check that values are numerical expression levels."
-        )
+    for col in df.columns:
+        norm = str(col).strip().upper()
+        if norm in required_cols:
+            col_mapping[col] = norm
+            found_cols.add(norm)
+        elif norm in ("ENTREZ", "ENTREZ_ID", "ENTREZID"):
+            col_mapping[col] = "ENTREZID"
+            found_cols.add("ENTREZID")
+        elif norm in ("GENE_SYMBOL", "GENESYMBOL", "SYMBOL"):
+            col_mapping[col] = "SYMBOL"
+            found_cols.add("SYMBOL")
+        elif norm in ("GENE_NAME", "GENENAME", "NAME", "DESCRIPTION"):
+            col_mapping[col] = "GENENAME"
+            found_cols.add("GENENAME")
 
-    return df_numeric
-
-def detect_orientation(df: pd.DataFrame, feature_list: List[str], id_map: Optional[dict] = None) -> str:
-    """
-    Determine if expression matrix is samples_x_genes or genes_x_samples.
-    Compares overlap with the model feature list.
-    
-    Returns:
-        'samples_x_genes' or 'genes_x_samples'
-    Raises:
-        UserInputError: If zero target features are matched in either dimension.
-    """
-    features_clean = {str(f).strip().upper() for f in feature_list}
-    if id_map:
-        for k, v in id_map.items():
-            features_clean.add(str(k).strip().upper())
-            features_clean.add(str(v).strip().upper())
-
-    cols_clean = {str(c).strip().upper() for c in df.columns}
-    idx_clean = {str(i).strip().upper() for i in df.index}
-
-    col_overlap = len(cols_clean.intersection(features_clean))
-    idx_overlap = len(idx_clean.intersection(features_clean))
-
-    if col_overlap == 0 and idx_overlap == 0:
-        raise UserInputError(
-            "None of the model's biomarker genes were found in the uploaded file. "
-            "Please ensure row or column labels match standard HGNC gene symbols (e.g. ADAM33, DNAJB1, RIPOR3)."
-        )
-
-    if col_overlap >= idx_overlap:
-        return "samples_x_genes"
-    else:
-        return "genes_x_samples"
-
-def validate_upload(
-    df: pd.DataFrame,
-    feature_list: List[str],
-    id_map: Optional[dict] = None
-) -> Tuple[pd.DataFrame, ValidationReport]:
-    """
-    Validate, sanitize, orient, and report on uploaded expression data.
-    
-    Returns:
-        (sanitized_samples_x_genes_df, ValidationReport)
-    """
-    warnings: List[str] = []
-    
-    # 1. Orientation detection and transposition
-    orientation = detect_orientation(df, feature_list, id_map)
-    if orientation == "genes_x_samples":
-        df = df.T
-        warnings.append("Detected genes as rows: matrix was automatically transposed to samples as rows.")
-
-    # 2. Handle duplicate gene columns
-    gene_cols = [str(c).strip() for c in df.columns]
-    df.columns = gene_cols
-
-    # Map Entrez IDs to Symbols if columns are numeric Entrez IDs
-    if id_map:
-        renamed_cols = {}
-        for c in df.columns:
-            if c in id_map:
-                renamed_cols[c] = id_map[c]
-            elif str(c) in id_map:
-                renamed_cols[c] = id_map[str(c)]
-        if renamed_cols:
-            df = df.rename(columns=renamed_cols)
-            warnings.append(f"Mapped {len(renamed_cols)} Entrez IDs to HGNC gene symbols.")
-
-    # Deduplicate genes by keeping the column with highest mean expression
-    if df.columns.duplicated().any():
-        dup_names = df.columns[df.columns.duplicated()].unique().tolist()
-        warnings.append(f"Duplicate gene columns found for: {dup_names}. Keeping column with highest average expression.")
-        kept_cols = []
-        for col_name in df.columns.unique():
-            sub = df[[col_name]]
-            if sub.shape[1] > 1:
-                best_idx = sub.mean().idxmax()
-                kept_cols.append(sub[best_idx])
-            else:
-                kept_cols.append(sub.iloc[:, 0])
-        df = pd.concat(kept_cols, axis=1)
-
-    # 3. Deduplicate sample IDs in index
-    df.index = [str(idx).strip() for idx in df.index]
-    duplicate_samples: List[str] = []
-    if df.index.duplicated().any():
-        seen = {}
-        new_index = []
-        for idx in df.index:
-            if idx in seen:
-                seen[idx] += 1
-                duplicate_samples.append(idx)
-                new_index.append(f"{idx}_{seen[idx]}")
-            else:
-                seen[idx] = 1
-                new_index.append(idx)
-        df.index = new_index
-        warnings.append(f"Duplicate sample IDs detected and disambiguated: {list(set(duplicate_samples))}.")
-
-    # 4. Feature coverage
-    req_set = set(feature_list)
-    present_set = set(df.columns)
-    matched = [f for f in feature_list if f in present_set]
-    missing = [f for f in feature_list if f not in present_set]
-    coverage = len(matched) / len(feature_list) if feature_list else 0.0
-
-    if coverage < MIN_FEATURE_COVERAGE:
-        pct = coverage * 100.0
-        min_pct = MIN_FEATURE_COVERAGE * 100.0
-        raise UserInputError(
-            f"Feature coverage is {pct:.1f}%, which is below the required {min_pct:.0f}% threshold ({len(matched)}/{len(feature_list)} genes present). "
-            f"Missing required genes: {missing}."
-        )
-
+    missing = required_cols - found_cols
     if missing:
-        warnings.append(f"{len(missing)} of {len(feature_list)} model genes missing. Imputing with training medians.")
-
-    # 5. Numerical checks
-    vals = df.values.flatten()
-    vals_valid = vals[~np.isnan(vals)]
-    has_negatives = bool(np.any(vals_valid < 0))
-    if has_negatives:
-        warnings.append("Matrix contains negative values. Ensure expression data is not heavily z-score centered across non-comparable cohorts.")
-
-    # Check for raw counts heuristic: all integer-valued and max > 1000
-    is_integers = bool(np.all(np.equal(np.mod(vals_valid[:1000], 1), 0)))
-    max_val = float(np.max(vals_valid)) if len(vals_valid) > 0 else 0.0
-    looks_raw = is_integers and max_val > 1000.0
-    if looks_raw:
-        warnings.append(
-            "Values appear to be unnormalized raw read counts (integer-valued, maximum > 1,000). "
-            "The model was trained on log2(CPM + 1) normalized expression. Results may be inaccurate unless normalized."
+        missing_str = ", ".join(sorted(list(missing)))
+        raise UserInputError(
+            f"Uploaded DEG list is missing required column(s): {missing_str}. "
+            f"The table must include at least: ENTREZID, SYMBOL, and GENENAME."
         )
 
-    report = ValidationReport(
-        n_samples=df.shape[0],
-        n_genes=df.shape[1],
-        coverage=coverage,
-        matched_features=matched,
-        missing_features=missing,
-        duplicate_ids=duplicate_samples,
-        negative_values=has_negatives,
-        looks_like_raw_counts=looks_raw,
-        warnings=warnings,
-        orientation=orientation
-    )
+    df = df.rename(columns=col_mapping)
 
-    return df, report
+    # Optional columns normalization if present
+    for col in df.columns:
+        norm = str(col).strip().upper()
+        if norm in ("LOGFC", "LOG2FC", "LOG2_FC"):
+            df = df.rename(columns={col: "logFC"})
+        elif norm in ("ADJ.P.VAL", "PADJ", "FDR", "QVALUE"):
+            df = df.rename(columns={col: "adj.P.Val"})
+
+    if len(df) > max_rows:
+        df = df.iloc[:max_rows].copy()
+
+    return df
+
+def load_optional_raw_data(
+    counts_file_or_path: Union[str, bytes, BinaryIO],
+    meta_file_or_path: Union[str, bytes, BinaryIO],
+    gene_id_col: str = None,
+    sample_id_col: str = None,
+    status_col: str = None
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Load and validate raw counts matrix and sample metadata for fallback DEG filtering.
+    """
+    try:
+        if isinstance(counts_file_or_path, str) and counts_file_or_path.endswith(".parquet"):
+            counts_df = pd.read_parquet(counts_file_or_path)
+        elif isinstance(counts_file_or_path, str) and (counts_file_or_path.endswith(".xlsx") or counts_file_or_path.endswith(".xls")):
+            counts_df = pd.read_excel(counts_file_or_path)
+        else:
+            filename = getattr(counts_file_or_path, "name", "").lower()
+            if filename.endswith(".parquet"):
+                counts_df = pd.read_parquet(counts_file_or_path)
+            elif filename.endswith(".xlsx") or filename.endswith(".xls"):
+                counts_df = pd.read_excel(counts_file_or_path)
+            else:
+                counts_df = pd.read_csv(counts_file_or_path, sep=None, engine="python")
+    except Exception as e:
+        raise UserInputError(f"Could not parse counts matrix: {str(e)}.")
+
+    try:
+        if isinstance(meta_file_or_path, str) and (meta_file_or_path.endswith(".xlsx") or meta_file_or_path.endswith(".xls")):
+            meta_df = pd.read_excel(meta_file_or_path)
+        else:
+            filename = getattr(meta_file_or_path, "name", "").lower()
+            if filename.endswith(".xlsx") or filename.endswith(".xls"):
+                meta_df = pd.read_excel(meta_file_or_path)
+            else:
+                meta_df = pd.read_csv(meta_file_or_path, sep=None, engine="python")
+    except Exception as e:
+        raise UserInputError(f"Could not parse sample metadata table: {str(e)}.")
+
+    # Validate gene ID column in counts
+    if gene_id_col is None:
+        possible_gene_cols = ["GENE ID", "GeneID", "gene_id", "ENTREZID", "ID", "gene"]
+        for c in possible_gene_cols:
+            if c in counts_df.columns:
+                gene_id_col = c
+                break
+        if gene_id_col is None:
+            gene_id_col = counts_df.columns[0]
+
+    # Validate metadata columns
+    if sample_id_col is None:
+        possible_sample_cols = ["COUNT", "SampleID", "Sample", "sample_id", "sample"]
+        for c in possible_sample_cols:
+            if c in meta_df.columns:
+                sample_id_col = c
+                break
+        if sample_id_col is None:
+            sample_id_col = meta_df.columns[0]
+
+    if status_col is None:
+        possible_status_cols = ["STATUS", "Disease_state", "group", "condition", "status"]
+        for c in possible_status_cols:
+            if c in meta_df.columns:
+                status_col = c
+                break
+        if status_col is None:
+            if len(meta_df.columns) > 1:
+                status_col = meta_df.columns[1]
+            else:
+                raise UserInputError("Sample metadata must contain at least two columns: Sample ID and Status/Condition.")
+
+    # Rename to standard internal names
+    counts_df = counts_df.rename(columns={gene_id_col: "GENE ID"})
+    meta_df = meta_df.rename(columns={sample_id_col: "COUNT", status_col: "STATUS"})
+
+    # Ensure >= 2 samples per status group
+    group_counts = meta_df["STATUS"].value_counts()
+    if len(group_counts) < 2:
+        raise UserInputError(f"Metadata must contain at least 2 distinct groups, found only: {list(group_counts.keys())}.")
+    if (group_counts < 2).any():
+        too_small = group_counts[group_counts < 2].to_dict()
+        raise UserInputError(f"Each experimental group must have at least 2 samples for statistical testing. Insufficient samples: {too_small}.")
+
+    return counts_df, meta_df

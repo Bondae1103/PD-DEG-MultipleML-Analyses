@@ -98,3 +98,40 @@
   6. **Vercel Zero-Build Deployment:** Packaged `index.html`, `vercel.json`, and static assets under `public/` and `images/` enabling 10-second serverless edge deployment with zero cold starts, while preserving `streamlit_app.py` for Python Streamlit workflows.
   7. **Documentation Updates:** Updated `DEPLOY.md` and `README.md` with 1-click Vercel import instructions and CLI deployment options.
 
+---
+
+## Phase 9: Plan v2 5-Method Multi-Page Architecture (PASSED)
+- **Status:** COMPLETE / PASS
+- **Execution Date:** 2026-09-29
+- **Implemented Scope:**
+  1. **Phase 0 Re-Verification Gate (`verify_pipeline.py`):**
+     - Located real GSE68719 files in parent directory (`wholegene.xlsx`, `metadata.xlsx`, `PD_DEG-1.xlsx` [PD_DEG]).
+     - Verified exact 430 -> 351 DEG cleaning reduction.
+     - Confirmed all 5 methods produce exact top 10 symbol matches with notebook outputs:
+       - LASSO: `['ADAM33', 'DNAJB1', 'C1QL3', 'CELF2-AS1', 'CISTR', 'CCN4', 'SYTL4', 'SHISA3', 'PRAP1', 'LINC01546']`
+       - Boruta (200 iters): `['ADAM33', 'SERPINF2', 'SIX5', 'PRELP', 'HSPB1', 'MT1A', 'SMTN', 'DNAJB1', 'RIPOR3', 'CSF1']`
+       - SVM-RFE: `['ADAM33', 'IFITM2', 'CISTR', 'OTOS', 'C1QL3', 'KCNQ5-DT', 'LINC03044', 'MT1A', 'CSAG1', 'CELF2-AS1']`
+       - Mutual Information: `['ADAM33', 'SIX5', 'RIPOR3', 'LRG1', 'LINC02019', 'PRELP', 'SERPINH1', 'CLDN9', 'HSPB1', 'TRIP10']`
+       - XGBoost: deterministic feature importances.
+     - Confirmed SHAP TreeExplainer additivity difference = `3.61e-16` (< 1e-3).
+     - Verified fallback filter runs in 0.215s (< 5s).
+  2. **Bundled Asset Export (`export_bundled_assets.py`):**
+     - Exported `sample_deg_list.csv` (430 rows, 10 columns).
+     - Exported `counts_matrix.parquet` (39,376 genes, 73 columns, float32, 5.59 MB).
+     - Exported `sample_metadata.csv` (72 samples: 44 NO_PD, 28 PD; T.20 outlier excluded).
+     - Exported `metadata.json` with full GEO provenance.
+  3. **Headless Core Engine (`app/core/`):**
+     - `io.py`: Ingestion & validation of custom DEG tables and raw counts/metadata.
+     - `preprocess.py`: Exact cleaning & library-size CPM normalization from full counts matrix.
+     - `methods.py`: Verbatim implementations of all 5 methods with progress callbacks.
+     - `consensus.py`: Exact 4-branch consensus rule (single method, strict intersection, most-occurring tier, fixed-order fallback).
+     - `deg_fallback.py`: Vectorized Welch's t-test + BH-FDR, clearly labeled as approximate substitute.
+     - `validate.py`: LOOCV with 500-tree balanced RandomForestClassifier.
+     - `plots.py`: Figure-returning plotting functions for ROC curve, Confusion Matrix, Boxplots, Clustered Heatmap, and SHAP beeswarm.
+  4. **Multipage Streamlit UI (`pages/` & `streamlit_app.py`):**
+     - Native multipage setup via `st.navigation` (`1_Landing.py`, `2_Output.py`, `3_About.py`).
+     - Session state isolation and empty/redirect guard on Output page.
+     - Comprehensive About page detailing methods, interpretations, and dataset narrative.
+  5. **Verification Suite (`app/tests/`):**
+     - 21 passed unit tests (100% pass rate).
+

@@ -1,71 +1,54 @@
+"""
+app/tests/test_io.py
+--------------------
+Unit tests for data intake in app/core/io.py per Plan v2 Section 4.1.
+Verifies column validation, format handling, and actionable error messages.
+"""
+
 import io
 import pytest
 import pandas as pd
-import numpy as np
+from app.core.io import load_deg_list, load_optional_raw_data, UserInputError
 
-from app.core import UserInputError
-from app.core.io import load_matrix, detect_orientation, validate_upload
+def test_load_deg_list_valid_csv():
+    csv_data = "ENTREZID,SYMBOL,GENENAME,logFC,adj.P.Val\n80332,ADAM33,ADAM metallopeptidase,1.5,0.001\n"
+    df = load_deg_list(io.StringIO(csv_data))
+    assert len(df) == 1
+    assert "ENTREZID" in df.columns
+    assert "SYMBOL" in df.columns
+    assert "GENENAME" in df.columns
 
-FEATURES = ["ADAM33", "DNAJB1", "RIPOR3", "HSPB1", "SIX5"]
+def test_load_deg_list_case_insensitive_and_alternate_names():
+    csv_data = "entrez_id,gene_symbol,gene_name\n1234,GENE1,Test Gene\n"
+    df = load_deg_list(io.StringIO(csv_data))
+    assert len(df) == 1
+    assert "ENTREZID" in df.columns
+    assert "SYMBOL" in df.columns
+    assert "GENENAME" in df.columns
 
-def test_load_matrix_csv_and_tsv():
-    csv_data = "sample_id,ADAM33,DNAJB1\nS1,4.5,2.1\nS2,3.8,1.9\n"
-    df = load_matrix(io.BytesIO(csv_data.encode("utf-8")))
-    assert df.shape == (2, 2)
-    assert "ADAM33" in df.columns
+def test_load_deg_list_missing_columns_raises_user_input_error():
+    csv_bad = "SYMBOL,GENENAME\nGENE1,Test Gene\n"
+    with pytest.raises(UserInputError) as exc_info:
+        load_deg_list(io.StringIO(csv_bad))
+    assert "missing required column(s): ENTREZID" in str(exc_info.value)
 
-    tsv_data = "sample_id\tADAM33\tDNAJB1\nS1\t4.5\t2.1\nS2\t3.8\t1.9\n"
-    df_tsv = load_matrix(io.BytesIO(tsv_data.encode("utf-8")))
-    assert df_tsv.shape == (2, 2)
+def test_load_optional_raw_data_valid():
+    counts_csv = "GENE ID,S1,S2,S3,S4\n101,10,20,30,40\n102,5,15,25,35\n"
+    meta_csv = "SampleID,STATUS\nS1,NO_PD\nS2,NO_PD\nS3,PD\nS4,PD\n"
 
-def test_detect_orientation_both():
-    # Samples x Genes
-    df_samples = pd.DataFrame(np.ones((3, 4)), index=["S1", "S2", "S3"], columns=["ADAM33", "DNAJB1", "G3", "G4"])
-    assert detect_orientation(df_samples, FEATURES) == "samples_x_genes"
-
-    # Genes x Samples (case and whitespace variants)
-    df_genes = pd.DataFrame(np.ones((4, 3)), index=["  adam33 ", "DNAJB1", "G3", "G4"], columns=["S1", "S2", "S3"])
-    assert detect_orientation(df_genes, FEATURES) == "genes_x_samples"
-
-def test_detect_orientation_zero_overlap_raises():
-    df_bad = pd.DataFrame(np.ones((2, 2)), index=["S1", "S2"], columns=["UNKNOWN1", "UNKNOWN2"])
-    with pytest.raises(UserInputError) as exc:
-        detect_orientation(df_bad, FEATURES)
-    assert "None of the model's biomarker genes were found" in str(exc.value)
-
-def test_validate_upload_duplicates_and_coverage():
-    # Duplicate columns and duplicate samples
-    df_dup = pd.DataFrame(
-        [[1.0, 2.0, 5.0, 3.0, 4.0], [2.0, 3.0, 6.0, 4.0, 5.0]],
-        index=["S1", "S1"],
-        columns=["ADAM33", "ADAM33", "DNAJB1", "RIPOR3", "HSPB1"]
+    counts_df, meta_df = load_optional_raw_data(
+        io.StringIO(counts_csv),
+        io.StringIO(meta_csv)
     )
-    df_clean, rep = validate_upload(df_dup, FEATURES)
-    assert len(df_clean.index) == 2
-    assert "S1_2" in df_clean.index or "S1" in df_clean.index
-    assert rep.coverage >= 0.8
-    assert len(rep.warnings) > 0
+    assert counts_df.shape == (2, 5)
+    assert meta_df.shape == (4, 2)
+    assert "GENE ID" in counts_df.columns
+    assert "STATUS" in meta_df.columns
 
-def test_validate_upload_low_coverage_raises():
-    df_low = pd.DataFrame([[1.0]], index=["S1"], columns=["ADAM33"])
-    with pytest.raises(UserInputError) as exc:
-        validate_upload(df_low, FEATURES)
-    assert "below the required" in str(exc.value)
+def test_load_optional_raw_data_insufficient_samples_raises():
+    counts_csv = "GENE ID,S1,S2\n101,10,20\n"
+    meta_csv = "SampleID,STATUS\nS1,NO_PD\nS2,PD\n" # Only 1 sample per group
 
-def test_raw_counts_warning():
-    # All integer and large
-    df_raw = pd.DataFrame(
-        np.array([[2000, 3500, 4100, 5000, 6000]], dtype=float),
-        index=["S1"],
-        columns=FEATURES
-    )
-    _, rep = validate_upload(df_raw, FEATURES)
-    assert rep.looks_like_raw_counts is True
-    assert any("raw read counts" in w for w in rep.warnings)
-
-def test_nan_threshold_raises():
-    # >5% non-numeric
-    bad_csv = "id,A,B\nS1,1.0,abc\nS2,def,2.0\nS3,3.0,4.0\n"
-    with pytest.raises(UserInputError) as exc:
-        load_matrix(io.BytesIO(bad_csv.encode("utf-8")))
-    assert "could not be converted to numeric" in str(exc.value)
+    with pytest.raises(UserInputError) as exc_info:
+        load_optional_raw_data(io.StringIO(counts_csv), io.StringIO(meta_csv))
+    assert "at least 2 samples" in str(exc_info.value)
