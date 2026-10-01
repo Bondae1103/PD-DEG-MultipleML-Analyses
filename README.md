@@ -41,7 +41,7 @@ npx vercel --prod
 python -m venv .venv-app && source .venv-app/bin/activate
 
 # 2. Install requirements
-pip install -r requirements-app.txt
+pip install -r requirements.txt
 
 # 3. Launch dashboard
 streamlit run streamlit_app.py

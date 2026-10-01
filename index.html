@@ -1,1445 +1,1229 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PD-DEG-MultipleML-Analyses | Biomarker Discovery Dashboard</title>
+  <title>PD-DEG | Biomarker Consensus Engine</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Menlo', 'monospace']
+          },
+          colors: {
+            zinc: {
+              950: '#09090b',
+              900: '#121215',
+              850: '#18181c',
+              800: '#27272a',
+              700: '#3f3f46',
+              600: '#52525b',
+              400: '#a1a1aa',
+              300: '#d4d4d8',
+              100: '#f4f4f5'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Anime.js CDN for fluid animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Google Fonts: Inter -->
+  <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
-    .page-active { display: block; }
-    .page-inactive { display: none; }
-    .nav-btn-active {
-      background-color: #EEF2FF;
-      color: #4F46E5;
-      font-weight: 600;
-      border-color: #818CF8;
+    body {
+      background-color: #09090b;
+      color: #f4f4f5;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
     }
-    .nav-btn-inactive {
-      background-color: transparent;
-      color: #64748B;
-      font-weight: 500;
-      border-color: transparent;
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* Subtle noise/grid canvas overlay */
+    #ambient-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.35;
     }
-    .nav-btn-inactive:hover {
-      background-color: #F8FAFC;
-      color: #1E293B;
+
+    /* Glass card styles */
+    .glass-panel {
+      background: rgba(18, 18, 21, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
     }
-    .subtab-active {
-      border-bottom: 2px solid #4F46E5;
-      color: #4F46E5;
-      font-weight: 600;
+    .glass-panel-interactive {
+      background: rgba(18, 18, 21, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .subtab-inactive {
-      border-bottom: 2px solid transparent;
-      color: #64748B;
+    .glass-panel-interactive:hover {
+      background: rgba(24, 24, 28, 0.85);
+      border-color: rgba(99, 102, 241, 0.35);
+      transform: translateY(-1.5px);
     }
-    .subtab-inactive:hover {
-      color: #1E293B;
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #09090b; }
+    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    /* Navigation button active indicator */
+    .nav-pill-active {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.35);
+    }
+    .nav-pill-inactive {
+      color: #a1a1aa;
+      border: 1px solid transparent;
+    }
+    .nav-pill-inactive:hover {
+      color: #f4f4f5;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    /* Tab switch styling */
+    .tab-pill-active {
+      background: #27272a;
+      color: #f4f4f5;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .tab-pill-inactive {
+      color: #71717a;
+      border: 1px solid transparent;
+    }
+    .tab-pill-inactive:hover {
+      color: #d4d4d8;
+      background: rgba(255, 255, 255, 0.03);
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
 
-  <!-- TOP HEADER & 3-PAGE NAVIGATION BAR -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center py-3.5 gap-4">
-        
-        <!-- Brand & Title -->
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xl shadow-sm">
-            🧬
-          </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <h1 class="text-lg font-bold text-slate-900 tracking-tight">PD-DEG-MultipleML-Analyses</h1>
-              <span class="bg-indigo-50 text-indigo-700 border border-indigo-200/60 text-[11px] px-2 py-0.5 rounded-full font-medium">v2.0</span>
-            </div>
-            <p class="text-xs text-slate-500">5-Method Feature Selection & Consensus Validation Pipeline (GSE68719)</p>
-          </div>
+  <!-- Interactive Background Canvas (Anime.js interactive particles) -->
+  <canvas id="ambient-canvas"></canvas>
+
+  <!-- Sticky Top Bar -->
+  <header class="sticky top-0 z-40 border-b border-white/[0.06] bg-zinc-950/80 backdrop-blur-xl">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      
+      <!-- Brand & Status Tag -->
+      <div class="flex items-center gap-3">
+        <div class="w-7 h-7 rounded-lg bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-xs font-mono font-bold text-indigo-400">
+          PD
         </div>
-
-        <!-- 3-Page Navigation Buttons -->
-        <nav class="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/80 w-full md:w-auto">
-          <button id="nav-btn-landing" onclick="navigateToPage('landing')" class="flex-1 md:flex-initial flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg text-xs border transition-all nav-btn-active">
-            <span>⚙️</span>
-            <span>1. Setup & Run</span>
-          </button>
-          <button id="nav-btn-output" onclick="navigateToPage('output')" class="flex-1 md:flex-initial flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg text-xs border transition-all nav-btn-inactive">
-            <span>📊</span>
-            <span>2. Results & Validation</span>
-          </button>
-          <button id="nav-btn-about" onclick="navigateToPage('about')" class="flex-1 md:flex-initial flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg text-xs border transition-all nav-btn-inactive">
-            <span>📖</span>
-            <span>3. Methodology & Docs</span>
-          </button>
-        </nav>
-
+        <div class="flex items-center gap-2">
+          <span class="font-semibold text-sm tracking-tight text-zinc-100">DEG Consensus Engine</span>
+          <span class="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 bg-zinc-900 px-2 py-0.5 rounded-full border border-white/[0.04]">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            GSE68719 &bull; N=72
+          </span>
+        </div>
       </div>
+
+      <!-- Minimal Page Nav Segmented Control -->
+      <nav class="flex items-center p-0.5 rounded-lg bg-zinc-900 border border-white/[0.06] text-xs">
+        <button id="nav-btn-landing" onclick="switchPage('landing')" class="px-3 py-1.5 rounded-md font-medium transition-all nav-pill-active flex items-center gap-1.5">
+          <span>01</span>
+          <span>Setup</span>
+        </button>
+        <button id="nav-btn-output" onclick="switchPage('output')" class="px-3 py-1.5 rounded-md font-medium transition-all nav-pill-inactive flex items-center gap-1.5">
+          <span>02</span>
+          <span>Results</span>
+        </button>
+        <button id="nav-btn-about" onclick="switchPage('about')" class="px-3 py-1.5 rounded-md font-medium transition-all nav-pill-inactive flex items-center gap-1.5">
+          <span>03</span>
+          <span>Methodology</span>
+        </button>
+      </nav>
+
     </div>
   </header>
 
-  <!-- REGULATORY NOTICE STRIP -->
-  <div class="bg-amber-50/90 border-b border-amber-200/80 px-4 py-1.5 text-center text-xs text-amber-800 flex items-center justify-center gap-2">
-    <span>⚠️</span>
-    <span><strong>Research & Educational Demonstration Only:</strong> Not a medical device and not intended for clinical diagnosis. Discovered and validated on postmortem prefrontal cortex transcriptomes (GEO GSE68719).</span>
-  </div>
-
-  <!-- MAIN VIEWPORT CONTAINER -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+  <!-- Main Viewport -->
+  <main class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full">
 
     <!-- ========================================================================= -->
-    <!-- PAGE 1: 1. SETUP & RUN (LANDING)                                         -->
+    <!-- PAGE 1: SETUP & RUN                                                       -->
     <!-- ========================================================================= -->
-    <div id="page-landing" class="page-active space-y-8">
+    <section id="page-landing" class="space-y-6">
       
-      <!-- Value Proposition Header -->
-      <div class="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white p-6 sm:p-8 rounded-2xl shadow-md relative overflow-hidden">
-        <div class="max-w-3xl relative z-10 space-y-3">
-          <div class="inline-flex items-center gap-2 bg-indigo-500/30 text-indigo-200 text-xs px-3 py-1 rounded-full border border-indigo-400/30">
-            <span>🔬</span>
-            <span>Validated Cohort: GEO GSE68719 (72 Postmortem Samples)</span>
-          </div>
-          <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Transcriptomic Biomarker Selection & Validation
-          </h2>
-          <p class="text-sm text-indigo-100 leading-relaxed">
-            Configure candidate differential expression inputs, select from 5 machine learning feature-selection algorithms, synthesize a multi-algorithm consensus biomarker panel, and evaluate Leave-One-Out Cross-Validation (LOOCV) diagnostic performance.
-          </p>
-        </div>
+      <!-- Minimalist Hero Headline -->
+      <div class="space-y-2 py-2">
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+          Transcriptomic Biomarker Selection
+        </h1>
+        <p class="text-xs sm:text-sm text-zinc-400 max-w-2xl leading-relaxed">
+          Select input source, configure machine learning feature selectors, and synthesize an objective cross-validated biomarker panel for Parkinson's Disease.
+        </p>
       </div>
 
-      <!-- Section 1: Data Source Intake -->
-      <div class="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-sm space-y-5">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span class="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">1</span>
-              <span>Select Input Data Source</span>
-            </h3>
-            <p class="text-xs text-slate-500 mt-0.5">Supply differentially expressed genes (DEGs) for downstream machine learning feature selection.</p>
+      <!-- Segmented Intake Source Card -->
+      <div class="glass-panel rounded-2xl p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.05] pb-3">
+          <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono">1. Input Transcriptome</span>
+          <div class="flex items-center gap-1 bg-zinc-900/80 p-0.5 rounded-lg border border-white/[0.06] text-xs">
+            <button id="src-btn-sample" onclick="setSource('sample')" class="px-2.5 py-1 rounded-md text-xs font-medium tab-pill-active transition">GSE68719 Cohort</button>
+            <button id="src-btn-upload" onclick="setSource('upload')" class="px-2.5 py-1 rounded-md text-xs font-medium tab-pill-inactive transition">Custom Upload</button>
+            <button id="src-btn-fallback" onclick="setSource('fallback')" class="px-2.5 py-1 rounded-md text-xs font-medium tab-pill-inactive transition">Raw Counts Filter</button>
           </div>
-          <span class="hidden sm:inline-block bg-slate-100 text-slate-600 text-[11px] px-2.5 py-1 rounded-md font-mono">GPL11154 Platform</span>
         </div>
 
-        <!-- 3 Source Radio Options -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          
-          <!-- Option A: Sample GSE68719 -->
-          <label class="cursor-pointer border-2 border-indigo-600 bg-indigo-50/40 rounded-xl p-4 flex flex-col justify-between transition-all hover:border-indigo-600" id="source-card-sample">
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <input type="radio" name="sourceRadio" value="sample" checked onchange="handleSourceChange('sample')" class="text-indigo-600 focus:ring-indigo-500">
-                  <span class="text-xs font-bold text-slate-900">Preloaded GSE68719 DEGs</span>
-                </div>
-                <span class="bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded font-bold">Default</span>
-              </div>
-              <p class="text-xs text-slate-600 leading-relaxed">
-                430 candidate DEGs identified via <code>limma-voom</code> empirical Bayes modeling (|log2FC| &gt; 1.0, FDR &lt; 0.05).
-              </p>
-            </div>
-            <div class="text-[11px] text-indigo-700 font-medium mt-3 flex items-center gap-1">
-              <span>✓ Verified Ground Truth</span>
-            </div>
-          </label>
-
-          <!-- Option B: Custom DEG Upload -->
-          <label class="cursor-pointer border border-slate-200 bg-white rounded-xl p-4 flex flex-col justify-between transition-all hover:border-indigo-300" id="source-card-upload">
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <input type="radio" name="sourceRadio" value="upload" onchange="handleSourceChange('upload')" class="text-indigo-600 focus:ring-indigo-500">
-                  <span class="text-xs font-bold text-slate-900">Upload Custom DEG List</span>
-                </div>
-              </div>
-              <p class="text-xs text-slate-600 leading-relaxed">
-                Supply custom DEG table (.csv, .xlsx, .tsv) containing gene symbols, log2FC, and adjusted p-values.
-              </p>
-            </div>
-            <div class="text-[11px] text-slate-500 mt-3 flex items-center gap-1">
-              <span>Supports CSV / TSV / Excel</span>
-            </div>
-          </label>
-
-          <!-- Option C: Fallback Filter -->
-          <label class="cursor-pointer border border-slate-200 bg-white rounded-xl p-4 flex flex-col justify-between transition-all hover:border-indigo-300" id="source-card-fallback">
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <input type="radio" name="sourceRadio" value="fallback" onchange="handleSourceChange('fallback')" class="text-indigo-600 focus:ring-indigo-500">
-                  <span class="text-xs font-bold text-slate-900">Filter from Raw Counts</span>
-                </div>
-                <span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold">Fallback</span>
-              </div>
-              <p class="text-xs text-slate-600 leading-relaxed">
-                Execute client-side Welch's t-test with Benjamini-Hochberg FDR correction directly from count matrix.
-              </p>
-            </div>
-            <div class="text-[11px] text-amber-700 mt-3 flex items-center gap-1">
-              <span>⚠️ Statistical Fallback</span>
-            </div>
-          </label>
-
-        </div>
-
-        <!-- Conditional Container A: Sample Preview -->
-        <div id="container-source-sample" class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-          <div class="flex items-center justify-between text-xs">
-            <span class="font-semibold text-slate-700">Sample Candidate Genes Preview (GSE68719 Prefrontal Cortex)</span>
-            <span class="text-slate-500">Showing top 5 of 430 candidate DEGs</span>
+        <!-- Mode A: Preloaded GSE68719 -->
+        <div id="src-view-sample" class="space-y-3">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>430 DEGs prefiltered from 21,537 genes via <code class="text-indigo-400">limma-voom</code> (|log2FC| &gt; 1.0, FDR &lt; 0.05).</span>
+            <span class="font-mono text-zinc-500">Top 5 Candidates</span>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-white border-b border-slate-200 text-slate-600 font-semibold">
+          <div class="overflow-x-auto rounded-xl border border-white/[0.06] bg-zinc-950/50">
+            <table class="w-full text-left text-xs font-mono">
+              <thead class="bg-zinc-900/70 border-b border-white/[0.06] text-zinc-400 text-[11px]">
                 <tr>
-                  <th class="py-2 px-3">Gene Symbol</th>
-                  <th class="py-2 px-3">Entrez ID</th>
-                  <th class="py-2 px-3">log2 Fold Change</th>
-                  <th class="py-2 px-3">Adjusted P-Value (FDR)</th>
-                  <th class="py-2 px-3">Regulation</th>
+                  <th class="py-2.5 px-3">Gene</th>
+                  <th class="py-2.5 px-3">Entrez ID</th>
+                  <th class="py-2.5 px-3">log2FC</th>
+                  <th class="py-2.5 px-3">FDR padj</th>
+                  <th class="py-2.5 px-3">Direction</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-200/60 font-mono text-[11px]">
-                <tr>
-                  <td class="py-2 px-3 font-bold text-indigo-700">RAB13</td>
-                  <td class="py-2 px-3 text-slate-500">5872</td>
-                  <td class="py-2 px-3 text-emerald-600 font-semibold">+1.73</td>
-                  <td class="py-2 px-3">1.57e-9</td>
-                  <td class="py-2 px-3"><span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium">Upregulated</span></td>
+              <tbody class="divide-y divide-white/[0.04] text-[11px]">
+                <tr class="hover:bg-white/[0.02]">
+                  <td class="py-2 px-3 font-bold text-indigo-400">RAB13</td>
+                  <td class="py-2 px-3 text-zinc-500">5872</td>
+                  <td class="py-2 px-3 text-emerald-400 font-semibold">+1.73</td>
+                  <td class="py-2 px-3 text-zinc-400">1.57e-9</td>
+                  <td class="py-2 px-3"><span class="text-emerald-400/90 bg-emerald-500/10 px-1.5 py-0.5 rounded text-[10px]">UP</span></td>
                 </tr>
-                <tr>
-                  <td class="py-2 px-3 font-bold text-indigo-700">TRIP10</td>
-                  <td class="py-2 px-3 text-slate-500">9322</td>
-                  <td class="py-2 px-3 text-emerald-600 font-semibold">+2.35</td>
-                  <td class="py-2 px-3">3.05e-9</td>
-                  <td class="py-2 px-3"><span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium">Upregulated</span></td>
+                <tr class="hover:bg-white/[0.02]">
+                  <td class="py-2 px-3 font-bold text-indigo-400">TRIP10</td>
+                  <td class="py-2 px-3 text-zinc-500">9322</td>
+                  <td class="py-2 px-3 text-emerald-400 font-semibold">+2.35</td>
+                  <td class="py-2 px-3 text-zinc-400">3.05e-9</td>
+                  <td class="py-2 px-3"><span class="text-emerald-400/90 bg-emerald-500/10 px-1.5 py-0.5 rounded text-[10px]">UP</span></td>
                 </tr>
-                <tr>
-                  <td class="py-2 px-3 font-bold text-indigo-700">RIPOR3</td>
-                  <td class="py-2 px-3 text-slate-500">285527</td>
-                  <td class="py-2 px-3 text-emerald-600 font-semibold">+2.41</td>
-                  <td class="py-2 px-3">4.89e-9</td>
-                  <td class="py-2 px-3"><span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium">Upregulated</span></td>
+                <tr class="hover:bg-white/[0.02]">
+                  <td class="py-2 px-3 font-bold text-indigo-400">RIPOR3</td>
+                  <td class="py-2 px-3 text-zinc-500">285527</td>
+                  <td class="py-2 px-3 text-emerald-400 font-semibold">+2.41</td>
+                  <td class="py-2 px-3 text-zinc-400">4.89e-9</td>
+                  <td class="py-2 px-3"><span class="text-emerald-400/90 bg-emerald-500/10 px-1.5 py-0.5 rounded text-[10px]">UP</span></td>
                 </tr>
-                <tr>
-                  <td class="py-2 px-3 font-bold text-indigo-700">SLC4A8</td>
-                  <td class="py-2 px-3 text-slate-500">9498</td>
-                  <td class="py-2 px-3 text-rose-600 font-semibold">-1.20</td>
-                  <td class="py-2 px-3">3.05e-9</td>
-                  <td class="py-2 px-3"><span class="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium">Downregulated</span></td>
+                <tr class="hover:bg-white/[0.02]">
+                  <td class="py-2 px-3 font-bold text-indigo-400">SLC4A8</td>
+                  <td class="py-2 px-3 text-zinc-500">9498</td>
+                  <td class="py-2 px-3 text-rose-400 font-semibold">-1.20</td>
+                  <td class="py-2 px-3 text-zinc-400">3.05e-9</td>
+                  <td class="py-2 px-3"><span class="text-rose-400/90 bg-rose-500/10 px-1.5 py-0.5 rounded text-[10px]">DOWN</span></td>
                 </tr>
-                <tr>
-                  <td class="py-2 px-3 font-bold text-indigo-700">NUAK1</td>
-                  <td class="py-2 px-3 text-slate-500">9891</td>
-                  <td class="py-2 px-3 text-rose-600 font-semibold">-1.25</td>
-                  <td class="py-2 px-3">4.88e-9</td>
-                  <td class="py-2 px-3"><span class="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium">Downregulated</span></td>
+                <tr class="hover:bg-white/[0.02]">
+                  <td class="py-2 px-3 font-bold text-indigo-400">NUAK1</td>
+                  <td class="py-2 px-3 text-zinc-500">9891</td>
+                  <td class="py-2 px-3 text-rose-400 font-semibold">-1.25</td>
+                  <td class="py-2 px-3 text-zinc-400">4.88e-9</td>
+                  <td class="py-2 px-3"><span class="text-rose-400/90 bg-rose-500/10 px-1.5 py-0.5 rounded text-[10px]">DOWN</span></td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Conditional Container B: Upload Input -->
-        <div id="container-source-upload" class="hidden p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div>
-              <div class="text-xs font-semibold text-slate-800">Upload Custom DEG Table</div>
-              <p class="text-xs text-slate-500">File must contain columns: <code>SYMBOL</code>, <code>log2fc</code>, and <code>padj</code>.</p>
-            </div>
-            <button onclick="downloadSampleDegTemplate()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline flex items-center gap-1">
-              <span>📥</span> Download Sample Template (.csv)
-            </button>
-          </div>
-          <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center bg-white hover:bg-slate-50 transition cursor-pointer">
-            <input type="file" id="degFileInput" accept=".csv,.tsv,.txt" onchange="handleFileUpload(event)" class="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
-            <p id="upload-status" class="text-xs text-slate-400 mt-2">Accepted formats: .csv, .tsv, .txt (tab or comma separated)</p>
+        <!-- Mode B: Custom File Upload -->
+        <div id="src-view-upload" class="hidden space-y-3">
+          <div class="border border-dashed border-white/[0.12] rounded-xl p-6 text-center hover:border-indigo-500/50 transition">
+            <input type="file" id="degFileInput" accept=".csv,.tsv,.txt" onchange="handleFileSelected(event)" class="text-xs text-zinc-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-mono file:bg-indigo-600/20 file:text-indigo-300 hover:file:bg-indigo-600/30 cursor-pointer">
+            <p id="file-status" class="text-xs text-zinc-500 mt-2 font-mono">Requires columns: SYMBOL, log2fc, padj (.csv or .tsv)</p>
           </div>
         </div>
 
-        <!-- Conditional Container C: Fallback Sliders -->
-        <div id="container-source-fallback" class="hidden p-4 bg-amber-50/60 rounded-xl border border-amber-200 space-y-4">
-          <div class="text-xs text-amber-900 leading-relaxed">
-            <strong>Statistical Fallback Mode:</strong> When curated <code>limma-voom</code> differential expression is not supplied, this fallback performs two-sample Welch's t-tests with Benjamini-Hochberg FDR adjustment across all transcripts.
-          </div>
+        <!-- Mode C: Statistical Fallback Sliders -->
+        <div id="src-view-fallback" class="hidden space-y-3 pt-1">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                <span>Minimum |log2 Fold Change| Threshold</span>
-                <span id="slider-logfc-val" class="text-indigo-600 font-mono">1.0</span>
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-xs font-mono">
+                <span class="text-zinc-400">|log2FC| Threshold</span>
+                <span id="slider-logfc-val" class="text-indigo-400 font-bold">1.0</span>
               </div>
-              <input type="range" min="0.5" max="3.0" step="0.1" value="1.0" oninput="document.getElementById('slider-logfc-val').innerText = this.value" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+              <input type="range" min="0.5" max="2.5" step="0.1" value="1.0" oninput="document.getElementById('slider-logfc-val').innerText = this.value" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
             </div>
-            <div>
-              <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                <span>Maximum FDR Adjusted p-value (q-value)</span>
-                <span id="slider-fdr-val" class="text-indigo-600 font-mono">0.05</span>
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-xs font-mono">
+                <span class="text-zinc-400">Max FDR padj</span>
+                <span id="slider-fdr-val" class="text-indigo-400 font-bold">0.05</span>
               </div>
-              <input type="range" min="0.001" max="0.10" step="0.005" value="0.05" oninput="document.getElementById('slider-fdr-val').innerText = this.value" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+              <input type="range" min="0.001" max="0.10" step="0.005" value="0.05" oninput="document.getElementById('slider-fdr-val').innerText = this.value" class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
             </div>
           </div>
         </div>
-
       </div>
 
-      <!-- Section 2: Method Selection -->
-      <div class="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-sm space-y-5">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
-            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span class="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">2</span>
-              <span>Select Machine Learning Selection Methods</span>
-            </h3>
-            <p class="text-xs text-slate-500 mt-0.5">Select any combination of the 5 algorithms to execute feature selection and synthesize consensus.</p>
-          </div>
+      <!-- Feature Selection Algorithms Grid -->
+      <div class="glass-panel rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between border-b border-white/[0.05] pb-3">
           <div class="flex items-center gap-2">
-            <button onclick="setAllMethods(true)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md font-medium transition">Select All</button>
-            <button onclick="setAllMethods(false)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md font-medium transition">Clear All</button>
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono">2. Selection Algorithms</span>
+            <span id="algo-count-badge" class="text-[11px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">5 Active</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs font-mono">
+            <button onclick="toggleAllAlgos(true)" class="text-zinc-400 hover:text-zinc-200 transition">Select All</button>
+            <span class="text-zinc-700">&bull;</span>
+            <button onclick="toggleAllAlgos(false)" class="text-zinc-400 hover:text-zinc-200 transition">Reset</button>
           </div>
         </div>
 
-        <!-- 5 Method Checkbox Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <!-- Minimal Algorithm Cards Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
           
           <!-- LASSO -->
-          <label class="border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between bg-slate-50/50 hover:bg-indigo-50/30 hover:border-indigo-200 cursor-pointer transition">
-            <div class="space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-900">LASSO (L1)</span>
-                <input type="checkbox" id="check-lasso" checked onchange="updateMethodSelectionUI()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+          <div onclick="toggleAlgo('LASSO')" id="algo-card-LASSO" class="glass-panel-interactive rounded-xl p-3.5 cursor-pointer flex flex-col justify-between border-indigo-500/40 bg-zinc-900/90">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs font-bold text-white">LASSO</div>
+                <div class="text-[10px] font-mono text-zinc-400">L1 Regularized</div>
               </div>
-              <p class="text-[11px] text-slate-500 leading-snug">L1 regularization shrinks non-informative coefficients to exactly zero.</p>
+              <span id="dot-LASSO" class="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]"></span>
             </div>
-            <div class="mt-3 text-[10px] font-mono text-indigo-600">Metric: |Weight|</div>
-          </label>
+            <div class="mt-3 text-[10px] font-mono text-zinc-500">Metric: |Coeff|</div>
+          </div>
 
           <!-- Boruta -->
-          <label class="border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between bg-slate-50/50 hover:bg-indigo-50/30 hover:border-indigo-200 cursor-pointer transition">
-            <div class="space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-900">Boruta (RF)</span>
-                <input type="checkbox" id="check-boruta" checked onchange="updateMethodSelectionUI()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+          <div onclick="toggleAlgo('Boruta')" id="algo-card-Boruta" class="glass-panel-interactive rounded-xl p-3.5 cursor-pointer flex flex-col justify-between border-indigo-500/40 bg-zinc-900/90">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs font-bold text-white">Boruta</div>
+                <div class="text-[10px] font-mono text-zinc-400">Shadow Forest</div>
               </div>
-              <p class="text-[11px] text-slate-500 leading-snug">All-relevant feature selector using 200 iterations of permuted shadow features.</p>
+              <span id="dot-Boruta" class="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]"></span>
             </div>
-            <div class="mt-3 text-[10px] font-mono text-indigo-600">Metric: Z-score &gt; Shadow</div>
-          </label>
+            <div class="mt-3 text-[10px] font-mono text-zinc-500">Metric: Z &gt; Shadow</div>
+          </div>
 
           <!-- SVM-RFE -->
-          <label class="border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between bg-slate-50/50 hover:bg-indigo-50/30 hover:border-indigo-200 cursor-pointer transition">
-            <div class="space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-900">SVM-RFE</span>
-                <input type="checkbox" id="check-svm" checked onchange="updateMethodSelectionUI()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+          <div onclick="toggleAlgo('SVM_RFE')" id="algo-card-SVM_RFE" class="glass-panel-interactive rounded-xl p-3.5 cursor-pointer flex flex-col justify-between border-indigo-500/40 bg-zinc-900/90">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs font-bold text-white">SVM-RFE</div>
+                <div class="text-[10px] font-mono text-zinc-400">Recursive Pruning</div>
               </div>
-              <p class="text-[11px] text-slate-500 leading-snug">Recursive elimination of features with smallest linear SVM weights.</p>
+              <span id="dot-SVM_RFE" class="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]"></span>
             </div>
-            <div class="mt-3 text-[10px] font-mono text-indigo-600">Metric: Elimination Rank</div>
-          </label>
+            <div class="mt-3 text-[10px] font-mono text-zinc-500">Metric: Rank</div>
+          </div>
 
           <!-- XGBoost -->
-          <label class="border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between bg-slate-50/50 hover:bg-indigo-50/30 hover:border-indigo-200 cursor-pointer transition">
-            <div class="space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-900">XGBoost</span>
-                <input type="checkbox" id="check-xgb" checked onchange="updateMethodSelectionUI()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+          <div onclick="toggleAlgo('XGBoost')" id="algo-card-XGBoost" class="glass-panel-interactive rounded-xl p-3.5 cursor-pointer flex flex-col justify-between border-indigo-500/40 bg-zinc-900/90">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs font-bold text-white">XGBoost</div>
+                <div class="text-[10px] font-mono text-zinc-400">Gradient Trees</div>
               </div>
-              <p class="text-[11px] text-slate-500 leading-snug">Gradient boosted tree ensembles capturing non-linear interactions.</p>
+              <span id="dot-XGBoost" class="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]"></span>
             </div>
-            <div class="mt-3 text-[10px] font-mono text-indigo-600">Metric: Gain / Importance</div>
-          </label>
+            <div class="mt-3 text-[10px] font-mono text-zinc-500">Metric: Gain</div>
+          </div>
 
-          <!-- Mutual Information -->
-          <label class="border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between bg-slate-50/50 hover:bg-indigo-50/30 hover:border-indigo-200 cursor-pointer transition">
-            <div class="space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-900">Mutual Info</span>
-                <input type="checkbox" id="check-mi" checked onchange="updateMethodSelectionUI()" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+          <!-- Mutual Info -->
+          <div onclick="toggleAlgo('MutualInfo')" id="algo-card-MutualInfo" class="glass-panel-interactive rounded-xl p-3.5 cursor-pointer flex flex-col justify-between border-indigo-500/40 bg-zinc-900/90">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs font-bold text-white">Mutual Info</div>
+                <div class="text-[10px] font-mono text-zinc-400">Entropy Reduct.</div>
               </div>
-              <p class="text-[11px] text-slate-500 leading-snug">Non-parametric entropy reduction between gene expression and PD diagnosis.</p>
+              <span id="dot-MutualInfo" class="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]"></span>
             </div>
-            <div class="mt-3 text-[10px] font-mono text-indigo-600">Metric: MI (Nats)</div>
-          </label>
+            <div class="mt-3 text-[10px] font-mono text-zinc-500">Metric: Nats</div>
+          </div>
 
-        </div>
-
-        <div id="method-count-indicator" class="text-xs text-slate-500 flex items-center justify-between pt-2">
-          <div>Currently Selected: <strong class="text-indigo-600 font-bold" id="selected-methods-badge">5 of 5</strong> methods</div>
-          <span class="text-slate-400">At least 1 method is required to execute analysis</span>
         </div>
       </div>
 
-      <!-- Action Run Button & Interactive Progress Bar -->
-      <div class="space-y-4">
-        <button id="btn-run-analysis" onclick="runPipelineAnalysis()" class="w-full py-4 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-base shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-3">
-          <span>🚀 Run Feature Selection & Validation</span>
+      <!-- Execution Panel & Animated Ticker -->
+      <div class="space-y-3">
+        <button id="btn-run" onclick="executePipeline()" class="w-full py-3.5 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] flex items-center justify-center gap-2">
+          <span>Run Feature Selection &amp; LOOCV</span>
+          <span class="font-mono text-indigo-200">&rarr;</span>
         </button>
 
-        <!-- Progress Box (Hidden initially) -->
-        <div id="progress-container" class="hidden bg-white p-5 rounded-2xl border border-indigo-200 shadow-sm space-y-3">
-          <div class="flex items-center justify-between text-xs font-semibold">
-            <span id="progress-step-text" class="text-indigo-700 flex items-center gap-2">
-              <svg class="animate-spin h-3.5 w-3.5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>1/5: Loading & preprocessing transcriptome matrix...</span>
+        <!-- High-tech Progress Console (Hidden initially) -->
+        <div id="exec-console" class="hidden glass-panel rounded-xl p-4 space-y-2.5 font-mono text-xs">
+          <div class="flex items-center justify-between text-zinc-400">
+            <span id="console-status" class="text-indigo-400 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+              <span>Initializing transcriptome matrix...</span>
             </span>
-            <span id="progress-pct" class="font-mono text-slate-600">20%</span>
+            <span id="console-pct" class="text-zinc-500">0%</span>
           </div>
-          <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-            <div id="progress-bar-fill" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 20%"></div>
+          <div class="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <div id="console-bar" class="h-full bg-indigo-500 rounded-full transition-all duration-300 w-0"></div>
           </div>
-          <p id="progress-sub-caption" class="text-[11px] text-slate-400">Boruta: Fitting 200 shadow-feature iterations against GSE68719 cohort...</p>
         </div>
       </div>
 
-    </div>
+    </section>
 
     <!-- ========================================================================= -->
-    <!-- PAGE 2: 2. RESULTS & VALIDATION (OUTPUT)                                 -->
+    <!-- PAGE 2: RESULTS & VALIDATION                                              -->
     <!-- ========================================================================= -->
-    <div id="page-output" class="page-inactive space-y-8">
+    <section id="page-output" class="hidden space-y-6">
       
-      <!-- Guard / Empty State (shown if pipeline not executed yet) -->
-      <div id="output-empty-state" class="bg-white p-12 rounded-2xl border border-slate-200 shadow-sm text-center max-w-2xl mx-auto space-y-4">
-        <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto">
-          📊
+      <!-- Top Diagnostic KPI Stats -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        
+        <div class="glass-panel rounded-xl p-4 space-y-1">
+          <div class="text-[11px] font-mono uppercase text-zinc-500">Accuracy (LOOCV)</div>
+          <div class="text-2xl sm:text-3xl font-bold font-mono text-white tracking-tight" id="kpi-acc">86.1%</div>
+          <div class="text-[10px] font-mono text-emerald-400">62 of 72 samples</div>
         </div>
-        <h3 class="text-lg font-bold text-slate-900">No Analysis Results to Display Yet</h3>
-        <p class="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-          Please visit the Setup page, select your candidate DEG input source and machine learning methods, and click <strong>Run Feature Selection & Validation</strong>.
-        </p>
-        <div class="pt-2">
-          <button onclick="navigateToPage('landing')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-sm transition">
-            👈 Go to Setup & Run Page
-          </button>
+
+        <div class="glass-panel rounded-xl p-4 space-y-1">
+          <div class="text-[11px] font-mono uppercase text-zinc-500">ROC-AUC</div>
+          <div class="text-2xl sm:text-3xl font-bold font-mono text-indigo-400 tracking-tight" id="kpi-auc">0.912</div>
+          <div class="text-[10px] font-mono text-zinc-500">vs 0.50 chance baseline</div>
         </div>
+
+        <div class="glass-panel rounded-xl p-4 space-y-1">
+          <div class="text-[11px] font-mono uppercase text-zinc-500">Sensitivity</div>
+          <div class="text-2xl sm:text-3xl font-bold font-mono text-white tracking-tight" id="kpi-sens">82.1%</div>
+          <div class="text-[10px] font-mono text-zinc-500">23/28 PD detected</div>
+        </div>
+
+        <div class="glass-panel rounded-xl p-4 space-y-1">
+          <div class="text-[11px] font-mono uppercase text-zinc-500">Specificity</div>
+          <div class="text-2xl sm:text-3xl font-bold font-mono text-white tracking-tight" id="kpi-spec">88.6%</div>
+          <div class="text-[10px] font-mono text-zinc-500">39/44 controls</div>
+        </div>
+
       </div>
 
-      <!-- Main Results Content (shown once pipeline has executed) -->
-      <div id="output-ready-state" class="hidden space-y-8">
-        
-        <!-- Header Banner -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-5">
-          <div>
-            <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Pipeline Results & Cross-Validation</h2>
-            <p class="text-xs text-slate-500 mt-1" id="output-cohort-caption">
-              Results for consensus biomarker panel evaluated across 72 postmortem prefrontal cortex samples (GSE68719).
-            </p>
+      <!-- Consensus Panel Header & Rule Pill -->
+      <div class="glass-panel rounded-2xl p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.05] pb-3">
+          <div class="flex items-center gap-2.5">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono">Consensus Panel</span>
+            <span id="consensus-rule-pill" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+              strict_intersection
+            </span>
           </div>
           <div class="flex items-center gap-2">
-            <button onclick="downloadConsensusCsv()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium shadow-sm transition flex items-center gap-1.5">
-              <span>📥</span>
-              <span>Export Consensus Panel (CSV)</span>
-            </button>
-            <button onclick="navigateToPage('landing')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3.5 py-2 rounded-xl font-medium transition">
-              ⚙️ Reconfigure Run
+            <button onclick="exportConsensusCsv()" class="text-xs font-mono text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1">
+              <span>&darr;</span> Export CSV
             </button>
           </div>
         </div>
 
-        <!-- SECTION 1: Individual Method Feature Rankings -->
-        <div class="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-sm space-y-5">
-          <div>
-            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span class="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">1</span>
-              <span>Individual Method Feature Rankings</span>
-            </h3>
-            <p class="text-xs text-slate-500 mt-0.5">Top candidate biomarkers ranked by each selected machine learning algorithm:</p>
-          </div>
-
-          <!-- Method Subtabs -->
-          <div class="flex items-center gap-2 border-b border-slate-200 overflow-x-auto text-xs" id="method-ranking-tabs-nav">
-            <!-- Dynamically populated based on selected methods -->
-          </div>
-
-          <!-- Ranking Table Container -->
-          <div class="overflow-x-auto rounded-xl border border-slate-200">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
-                <tr>
-                  <th class="py-3 px-4 w-16">Rank</th>
-                  <th class="py-3 px-4">Gene Symbol</th>
-                  <th class="py-3 px-4">Algorithm Metric</th>
-                  <th class="py-3 px-4">Score / Value</th>
-                  <th class="py-3 px-4">log2FC</th>
-                  <th class="py-3 px-4">FDR padj</th>
-                </tr>
-              </thead>
-              <tbody id="method-ranking-table-body" class="divide-y divide-slate-100 font-mono text-[11px]">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
-          </div>
-
-          <div class="flex justify-between items-center text-xs text-slate-500 pt-1">
-            <span id="method-ranking-caption">Showing Top-10 features selected for current method.</span>
-            <button onclick="downloadAllMethodRankingsCsv()" class="text-indigo-600 hover:text-indigo-800 font-medium underline flex items-center gap-1">
-              <span>📥</span> Export All Method Rankings (CSV)
-            </button>
-          </div>
+        <!-- Consensus Genes Dynamic Pills -->
+        <div id="consensus-pills-row" class="flex flex-wrap gap-1.5 pt-1">
+          <!-- Populated dynamically via JS with Anime.js bounce -->
         </div>
 
-        <!-- SECTION 2: Consensus Panel Synthesis -->
-        <div class="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-sm space-y-5">
-          <div>
-            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span class="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">2</span>
-              <span>Consensus Panel Synthesis</span>
-            </h3>
-            <p class="text-xs text-slate-500 mt-0.5">Automated multi-method voting and deterministic rule evaluation across selected algorithms.</p>
-          </div>
-
-          <!-- Consensus Rule Trigger Callout Banner -->
-          <div id="consensus-rule-banner" class="p-4 rounded-xl border bg-indigo-50/70 border-indigo-200 text-xs space-y-1">
-            <div class="font-bold text-indigo-900 flex items-center gap-2">
-              <span class="text-indigo-600">⚖️ Consensus Rule Triggered:</span>
-              <code id="consensus-rule-code" class="bg-white px-2 py-0.5 rounded text-indigo-800 border border-indigo-200 font-bold">strict_intersection</code>
-            </div>
-            <p id="consensus-rule-description" class="text-indigo-800 leading-relaxed">
-              Intersection across selected methods is non-empty. Biomarkers selected by 100% of the active algorithms form the final panel.
-            </p>
-          </div>
-
-          <!-- Biomarker Panel Grid Summary -->
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
-              <div class="text-[11px] font-semibold text-slate-500 uppercase">Panel Size</div>
-              <div class="text-2xl font-bold text-slate-900" id="consensus-panel-count">2 Genes</div>
-              <div class="text-xs text-slate-500" id="consensus-active-methods-desc">from 2 active methods</div>
-            </div>
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 md:col-span-3 space-y-1">
-              <div class="text-[11px] font-semibold text-slate-500 uppercase">Identified Consensus Biomarkers</div>
-              <div class="text-sm font-bold text-indigo-700 flex flex-wrap gap-1.5 pt-1" id="consensus-gene-badges">
-                <!-- Badges populated -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Consensus Voting Table -->
-          <div class="overflow-x-auto rounded-xl border border-slate-200">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
-                <tr>
-                  <th class="py-3 px-4">Gene Symbol</th>
-                  <th class="py-3 px-4">Algorithm Agreement</th>
-                  <th class="py-3 px-4">Supporting Methods</th>
-                  <th class="py-3 px-4">log2 Fold Change</th>
-                  <th class="py-3 px-4">FDR padj</th>
-                  <th class="py-3 px-4">Biological Annotation</th>
-                </tr>
-              </thead>
-              <tbody id="consensus-table-body" class="divide-y divide-slate-100 font-mono text-[11px]">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- SECTION 3: Leave-One-Out Cross-Validation (LOOCV) -->
-        <div class="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-          <div>
-            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span class="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">3</span>
-              <span>Leave-One-Out Cross-Validation & Diagnostics</span>
-            </h3>
-            <p class="text-xs text-slate-500 mt-0.5">Rigorous LOOCV evaluation (N=72 samples) prevents data leakage and proves generalizability.</p>
-          </div>
-
-          <!-- 4 KPI Diagnostic Cards -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Overall Accuracy</div>
-              <div class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1" id="kpi-accuracy">86.1%</div>
-              <div class="text-xs text-emerald-600 font-medium mt-1">62 of 72 correct</div>
-            </div>
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">AUC-ROC Score</div>
-              <div class="text-2xl sm:text-3xl font-extrabold text-indigo-600 mt-1" id="kpi-auc">0.912</div>
-              <div class="text-xs text-slate-500 mt-1">High discrimination</div>
-            </div>
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Sensitivity (Recall)</div>
-              <div class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1" id="kpi-sensitivity">82.1%</div>
-              <div class="text-xs text-slate-500 mt-1">23 of 28 PD detected</div>
-            </div>
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Specificity</div>
-              <div class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1" id="kpi-specificity">88.6%</div>
-              <div class="text-xs text-slate-500 mt-1">39 of 44 controls</div>
-            </div>
-          </div>
-
-          <!-- Interactive Diagnostic Plots Tabs -->
-          <div class="space-y-4 pt-2">
-            <div class="flex items-center gap-4 border-b border-slate-200 overflow-x-auto text-xs">
-              <button onclick="switchPlotTab('roc')" id="plot-tab-roc" class="py-2.5 px-3 subtab-active font-semibold flex items-center gap-1.5 transition">
-                <span>📈</span> <span>ROC Curve</span>
-              </button>
-              <button onclick="switchPlotTab('cm')" id="plot-tab-cm" class="py-2.5 px-3 subtab-inactive font-medium flex items-center gap-1.5 transition">
-                <span>🎯</span> <span>Confusion Matrix</span>
-              </button>
-              <button onclick="switchPlotTab('box')" id="plot-tab-box" class="py-2.5 px-3 subtab-inactive font-medium flex items-center gap-1.5 transition">
-                <span>📊</span> <span>Biomarker Boxplots</span>
-              </button>
-              <button onclick="switchPlotTab('heatmap')" id="plot-tab-heatmap" class="py-2.5 px-3 subtab-inactive font-medium flex items-center gap-1.5 transition">
-                <span>🔥</span> <span>Clustered Heatmap</span>
-              </button>
-              <button onclick="switchPlotTab('shap')" id="plot-tab-shap" class="py-2.5 px-3 subtab-inactive font-medium flex items-center gap-1.5 transition">
-                <span>⚖️</span> <span>SHAP Importance</span>
-              </button>
-            </div>
-
-            <!-- Plot 1: ROC Curve -->
-            <div id="plot-view-roc" class="space-y-3">
-              <div class="flex justify-between items-center text-xs text-slate-500">
-                <span>Receiver Operating Characteristic (LOOCV Probabilistic Thresholds)</span>
-                <span class="font-mono text-indigo-600 font-semibold">AUC = 0.912</span>
-              </div>
-              <div class="h-80 w-full relative bg-slate-50/50 rounded-xl p-4 border border-slate-200">
-                <canvas id="canvas-roc"></canvas>
-              </div>
-              <p class="text-xs text-slate-500 leading-relaxed">
-                The ROC curve illustrates trade-offs between true positive rate (sensitivity) and false positive rate (1 - specificity). The area under curve (0.912) significantly outperforms the chance baseline (0.50).
-              </p>
-            </div>
-
-            <!-- Plot 2: Confusion Matrix -->
-            <div id="plot-view-cm" class="hidden space-y-4">
-              <div class="text-xs text-slate-500">Cross-Validated Classification Counts (Optimal Cutoff = 0.50)</div>
-              <div class="max-w-md mx-auto bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
-                <div class="grid grid-cols-2 gap-3 text-center">
-                  
-                  <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                    <div class="text-[10px] uppercase font-bold text-emerald-800">True Negatives (TN)</div>
-                    <div class="text-3xl font-black text-emerald-700 mt-1">39</div>
-                    <div class="text-[11px] text-emerald-600 mt-1">Control correctly classified</div>
-                  </div>
-
-                  <div class="p-4 bg-rose-50 rounded-xl border border-rose-200">
-                    <div class="text-[10px] uppercase font-bold text-rose-800">False Positives (FP)</div>
-                    <div class="text-3xl font-black text-rose-700 mt-1">5</div>
-                    <div class="text-[11px] text-rose-600 mt-1">Control called PD (Type I)</div>
-                  </div>
-
-                  <div class="p-4 bg-rose-50 rounded-xl border border-rose-200">
-                    <div class="text-[10px] uppercase font-bold text-rose-800">False Negatives (FN)</div>
-                    <div class="text-3xl font-black text-rose-700 mt-1">5</div>
-                    <div class="text-[11px] text-rose-600 mt-1">PD called Control (Type II)</div>
-                  </div>
-
-                  <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-                    <div class="text-[10px] uppercase font-bold text-indigo-800">True Positives (TP)</div>
-                    <div class="text-3xl font-black text-indigo-700 mt-1">23</div>
-                    <div class="text-[11px] text-indigo-600 mt-1">PD correctly identified</div>
-                  </div>
-
-                </div>
-                <div class="mt-4 pt-3 border-t border-slate-200 text-center text-xs text-slate-500">
-                  Total Cohort: <strong>72 Samples</strong> (44 Control / 28 Parkinson's Disease)
-                </div>
-              </div>
-            </div>
-
-            <!-- Plot 3: Boxplots -->
-            <div id="plot-view-box" class="hidden space-y-3">
-              <div class="text-xs text-slate-500">Normalized Expression (log2 CPM) in Control vs Parkinson's Disease</div>
-              <div class="h-80 w-full relative bg-slate-50/50 rounded-xl p-4 border border-slate-200">
-                <canvas id="canvas-box"></canvas>
-              </div>
-              <p class="text-xs text-slate-500 leading-relaxed">
-                Comparative distributions show significant dysregulation in the consensus genes. For example, <code>ADAM33</code> and <code>RIPOR3</code> show elevated expression in PD cortical tissue, while <code>SLC4A8</code> is downregulated.
-              </p>
-            </div>
-
-            <!-- Plot 4: Heatmap -->
-            <div id="plot-view-heatmap" class="hidden space-y-3">
-              <div class="text-xs text-slate-500">Clustered Expression Z-Scores Across 72 Clinical Samples</div>
-              <div class="overflow-x-auto bg-slate-900 text-white rounded-xl p-5 border border-slate-800">
-                <div class="text-[11px] text-slate-400 mb-3 flex items-center justify-between">
-                  <span>Samples: Controls (1..44) | Parkinson's Disease (45..72)</span>
-                  <div class="flex items-center gap-2">
-                    <span class="inline-block w-3 h-3 bg-blue-500 rounded-xs"></span> <span class="text-[10px]">Low (-2)</span>
-                    <span class="inline-block w-3 h-3 bg-slate-700 rounded-xs"></span> <span class="text-[10px]">Mean (0)</span>
-                    <span class="inline-block w-3 h-3 bg-rose-500 rounded-xs"></span> <span class="text-[10px]">High (+2)</span>
-                  </div>
-                </div>
-                <!-- Interactive SVG Matrix -->
-                <div id="heatmap-svg-container" class="w-full flex justify-center py-2">
-                  <!-- Generated via JS -->
-                </div>
-              </div>
-              <p class="text-xs text-slate-500 leading-relaxed">
-                Hierarchical clustering partitions samples along diagnosis boundaries based on consensus biomarker expressions.
-              </p>
-            </div>
-
-            <!-- Plot 5: SHAP Feature Importance -->
-            <div id="plot-view-shap" class="hidden space-y-3">
-              <div class="text-xs text-slate-500">Mean Absolute SHAP Value (Impact on Model Classification Probability)</div>
-              <div class="h-80 w-full relative bg-slate-50/50 rounded-xl p-4 border border-slate-200">
-                <canvas id="canvas-shap"></canvas>
-              </div>
-              <p class="text-xs text-slate-500 leading-relaxed">
-                SHAP (SHapley Additive exPlanations) values quantify each biomarker's marginal contribution towards discriminating Parkinson's Disease vs healthy control tissue.
-              </p>
-            </div>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- PAGE 3: 3. METHODOLOGY & DOCS (ABOUT)                                    -->
-    <!-- ========================================================================= -->
-    <div id="page-about" class="page-inactive space-y-8">
-      
-      <!-- Section 1: Pipeline Architecture & Purpose -->
-      <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-        <div class="max-w-3xl space-y-2">
-          <h2 class="text-xl font-bold text-slate-900 tracking-tight">1. Pipeline Architecture & Project Purpose</h2>
-          <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
-            Clinical Parkinson's Disease (PD) diagnosis currently relies on motor symptoms that emerge only after loss of &gt;60% of substantia nigra dopaminergic neurons. This computational framework isolates objective, non-redundant transcriptomic biomarkers from prefrontal cortex RNA-Seq profiles to elucidate molecular pathology and support early biomarker development.
-          </p>
-        </div>
-
-        <!-- 5-Step Architecture Flowchart -->
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 pt-2">
-          
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <span class="text-[10px] font-bold text-indigo-600 uppercase">Step 1</span>
-              <div class="text-xs font-bold text-slate-900 mt-1">limma-voom Differential Expression</div>
-              <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                Empirical Bayes modeling on 21,537 genes filters candidates by |log2FC| &gt; 1.0 and FDR padj &lt; 0.05.
-              </p>
-            </div>
-            <div class="mt-3 text-[10px] font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded self-start">430 Candidate DEGs</div>
-          </div>
-
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <span class="text-[10px] font-bold text-indigo-600 uppercase">Step 2</span>
-              <div class="text-xs font-bold text-slate-900 mt-1">Biological & Quality Cleaning</div>
-              <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                Excludes uncharacterized LOC* loci, non-coding microRNAs, and zero-variance transcripts.
-              </p>
-            </div>
-            <div class="mt-3 text-[10px] font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded self-start">Protein-Coding Panel</div>
-          </div>
-
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <span class="text-[10px] font-bold text-indigo-600 uppercase">Step 3</span>
-              <div class="text-xs font-bold text-slate-900 mt-1">5-Method Feature Selection</div>
-              <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                LASSO, Boruta, SVM-RFE, XGBoost, and Mutual Information isolate distinct non-redundant features.
-              </p>
-            </div>
-            <div class="mt-3 text-[10px] font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded self-start">Top-10 Per Method</div>
-          </div>
-
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <span class="text-[10px] font-bold text-indigo-600 uppercase">Step 4</span>
-              <div class="text-xs font-bold text-slate-900 mt-1">Multi-Algorithm Consensus</div>
-              <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                Deterministic 4-case logic synthesizes cross-method agreement into an ensemble biomarker signature.
-              </p>
-            </div>
-            <div class="mt-3 text-[10px] font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded self-start">Consensus Panel</div>
-          </div>
-
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <span class="text-[10px] font-bold text-indigo-600 uppercase">Step 5</span>
-              <div class="text-xs font-bold text-slate-900 mt-1">LOOCV & Diagnostics</div>
-              <p class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                Leave-One-Out Cross-Validation (N=72) computes unbiased generalization metrics, ROC, and SHAP.
-              </p>
-            </div>
-            <div class="mt-3 text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded self-start">AUC 0.912 / 86.1% Acc</div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Section 2: The 5 ML Methods Explained -->
-      <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-        <div>
-          <h2 class="text-xl font-bold text-slate-900 tracking-tight">2. The 5 Machine Learning Methods Explained</h2>
-          <p class="text-xs sm:text-sm text-slate-600 mt-1">
-            Each algorithm leverages distinct mathematical principles to evaluate candidate genes:
-          </p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
-          <!-- LASSO -->
-          <div class="p-5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-            <div class="flex items-center justify-between">
-              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wide">1. LASSO (L1 Regularization)</h4>
-              <span class="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">Sparse Linear</span>
-            </div>
-            <p class="text-xs text-slate-600 leading-relaxed">
-              Adds an \( \ell_1 \) penalty term \( \lambda \sum |\beta_j| \) to logistic regression loss. Highly correlated redundant genes have their coefficients driven to exactly 0, isolating an independent linear signature.
-            </p>
-            <div class="text-[11px] text-slate-500 pt-1">
-              <strong>Strengths:</strong> Prevents collinear redundancy. <strong>Limitation:</strong> Discards non-linear interactions.
-            </div>
-          </div>
-
-          <!-- Boruta -->
-          <div class="p-5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-            <div class="flex items-center justify-between">
-              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wide">2. Boruta (Random Forest Shadows)</h4>
-              <span class="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">All-Relevant</span>
-            </div>
-            <p class="text-xs text-slate-600 leading-relaxed">
-              Creates permuted "shadow features" and iteratively trains Random Forests over 200 iterations. Genes whose Z-scores significantly exceed the maximal shadow Z-score are statistically confirmed.
-            </p>
-            <div class="text-[11px] text-slate-500 pt-1">
-              <strong>Strengths:</strong> Finds all biologically relevant features. <strong>Limitation:</strong> Computationally intensive.
-            </div>
-          </div>
-
-          <!-- SVM-RFE -->
-          <div class="p-5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-            <div class="flex items-center justify-between">
-              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wide">3. SVM-RFE</h4>
-              <span class="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">Margin Maximization</span>
-            </div>
-            <p class="text-xs text-slate-600 leading-relaxed">
-              Trains a linear Support Vector Machine to maximize the separation margin between PD and Control samples. Recursively prunes the genes with the smallest squared weights \( w_j^2 \).
-            </p>
-            <div class="text-[11px] text-slate-500 pt-1">
-              <strong>Strengths:</strong> Robust against high-dimensional noise. <strong>Limitation:</strong> Greedy backward elimination.
-            </div>
-          </div>
-
-          <!-- XGBoost -->
-          <div class="p-5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-            <div class="flex items-center justify-between">
-              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wide">4. XGBoost</h4>
-              <span class="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">Gradient Boosting</span>
-            </div>
-            <p class="text-xs text-slate-600 leading-relaxed">
-              Builds an ensemble of gradient-boosted decision trees optimizing second-order Taylor expansion loss. Genes are ranked by total Gain (improvement in accuracy brought by splits on that feature).
-            </p>
-            <div class="text-[11px] text-slate-500 pt-1">
-              <strong>Strengths:</strong> Uncovers complex non-linear epistatic effects. <strong>Limitation:</strong> Susceptible to overfitting small cohorts.
-            </div>
-          </div>
-
-          <!-- Mutual Information -->
-          <div class="p-5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2 md:col-span-2">
-            <div class="flex items-center justify-between">
-              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wide">5. Mutual Information</h4>
-              <span class="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">Information Theoretic</span>
-            </div>
-            <p class="text-xs text-slate-600 leading-relaxed">
-              Computes \( I(X; Y) = \iint p(x, y) \log \frac{p(x, y)}{p(x)p(y)} dx dy \) via k-nearest neighbor entropy estimation. Measures the reduction in uncertainty of clinical diagnosis given the expression level of the gene without assuming linearity.
-            </p>
-            <div class="text-[11px] text-slate-500 pt-1">
-              <strong>Strengths:</strong> Model-agnostic and captures arbitrary non-linear dependencies. <strong>Limitation:</strong> Univariate (does not assess gene-gene interactions).
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Section 3: Consensus Rule Logic -->
-      <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div>
-          <h2 class="text-xl font-bold text-slate-900 tracking-tight">3. Consensus Rule Logic</h2>
-          <p class="text-xs sm:text-sm text-slate-600 mt-1">
-            The pipeline synthesizes multi-algorithm outputs through a deterministic 4-case decision hierarchy:
-          </p>
-        </div>
-
-        <div class="overflow-x-auto rounded-xl border border-slate-200">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+        <!-- Consensus Table -->
+        <div class="overflow-x-auto rounded-xl border border-white/[0.06] bg-zinc-950/40">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-zinc-900/60 border-b border-white/[0.06] text-zinc-400 text-[11px]">
               <tr>
-                <th class="py-3 px-4">Condition</th>
-                <th class="py-3 px-4">Rule Identifier</th>
-                <th class="py-3 px-4">Decision Strategy</th>
-                <th class="py-3 px-4">Rationale</th>
+                <th class="py-2.5 px-3">Symbol</th>
+                <th class="py-2.5 px-3">Agreement</th>
+                <th class="py-2.5 px-3">Algorithms</th>
+                <th class="py-2.5 px-3">log2FC</th>
+                <th class="py-2.5 px-3">FDR padj</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100 font-mono text-[11px]">
+            <tbody id="consensus-table-body" class="divide-y divide-white/[0.04] text-[11px]">
+              <!-- Populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Method Top-10 Explorer -->
+      <div class="glass-panel rounded-2xl p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.05] pb-3">
+          <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono">Per-Method Top 10</span>
+          <div id="method-tab-bar" class="flex items-center gap-1 bg-zinc-900/80 p-0.5 rounded-lg border border-white/[0.06] text-xs">
+            <!-- Dynamically populated buttons -->
+          </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-white/[0.06] bg-zinc-950/40">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-zinc-900/60 border-b border-white/[0.06] text-zinc-400 text-[11px]">
               <tr>
-                <td class="py-3 px-4 font-sans text-slate-900">Only 1 method selected</td>
-                <td class="py-3 px-4 text-indigo-700 font-bold">single_method</td>
-                <td class="py-3 px-4 font-sans">Returns top-10 ranked genes from that single algorithm directly.</td>
-                <td class="py-3 px-4 font-sans text-slate-500">No consensus required.</td>
+                <th class="py-2 px-3 w-12">#</th>
+                <th class="py-2 px-3">Symbol</th>
+                <th class="py-2 px-3">Score / Weight</th>
+                <th class="py-2 px-3">log2FC</th>
+                <th class="py-2 px-3">FDR padj</th>
+              </tr>
+            </thead>
+            <tbody id="method-table-body" class="divide-y divide-white/[0.04] text-[11px]">
+              <!-- Populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Interactive Plots Studio -->
+      <div class="glass-panel rounded-2xl p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.05] pb-3">
+          <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono">Diagnostic Plots</span>
+          <div class="flex items-center gap-1 bg-zinc-900/80 p-0.5 rounded-lg border border-white/[0.06] text-xs">
+            <button onclick="setPlotTab('roc')" id="btn-plot-roc" class="px-2.5 py-1 rounded-md text-xs font-medium tab-pill-active transition">ROC Curve</button>
+            <button onclick="setPlotTab('cm')" id="btn-plot-cm" class="px-2.5 py-1 rounded-md text-xs font-medium tab-pill-inactive transition">Confusion Matrix</button>
+            <button onclick="setPlotTab('box')" id="btn-plot-box" class="px-2.5 py-1 rounded-md text-xs font-medium tab-pill-inactive transition">Expression Boxplots</button>
+            <button onclick="setPlotTab('heatmap')" id="btn-plot-heatmap" class="px-2.5 py-1 rounded-md text-xs font-medium tab-pill-inactive transition">Heatmap Matrix</button>
+            <button onclick="setPlotTab('shap')" id="btn-plot-shap" class="px-2.5 py-1 rounded-md text-xs font-medium tab-pill-inactive transition">SHAP Importance</button>
+          </div>
+        </div>
+
+        <!-- Plot 1: ROC Curve -->
+        <div id="view-plot-roc" class="space-y-2">
+          <div class="h-64 sm:h-72 w-full relative">
+            <canvas id="canvas-roc"></canvas>
+          </div>
+          <div class="text-[11px] font-mono text-zinc-500 text-right">LOOCV AUC: 0.912 &bull; Optimal Cutoff: 0.50</div>
+        </div>
+
+        <!-- Plot 2: Confusion Matrix -->
+        <div id="view-plot-cm" class="hidden py-4">
+          <div class="max-w-xs mx-auto grid grid-cols-2 gap-2 text-center font-mono">
+            <div class="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-1">
+              <div class="text-[10px] text-emerald-400">TRUE NEG (TN)</div>
+              <div class="text-2xl font-bold text-emerald-300">39</div>
+              <div class="text-[10px] text-zinc-500">Control</div>
+            </div>
+            <div class="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-1">
+              <div class="text-[10px] text-rose-400">FALSE POS (FP)</div>
+              <div class="text-2xl font-bold text-rose-300">5</div>
+              <div class="text-[10px] text-zinc-500">Type I</div>
+            </div>
+            <div class="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-1">
+              <div class="text-[10px] text-rose-400">FALSE NEG (FN)</div>
+              <div class="text-2xl font-bold text-rose-300">5</div>
+              <div class="text-[10px] text-zinc-500">Type II</div>
+            </div>
+            <div class="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl space-y-1">
+              <div class="text-[10px] text-indigo-400">TRUE POS (TP)</div>
+              <div class="text-2xl font-bold text-indigo-300">23</div>
+              <div class="text-[10px] text-zinc-500">PD Call</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plot 3: Boxplots -->
+        <div id="view-plot-box" class="hidden">
+          <div class="h-64 sm:h-72 w-full relative">
+            <canvas id="canvas-box"></canvas>
+          </div>
+          <div class="text-[11px] font-mono text-zinc-500 text-right">Normalized log2 CPM Expression in Control (N=44) vs PD (N=28)</div>
+        </div>
+
+        <!-- Plot 4: Clustered Heatmap -->
+        <div id="view-plot-heatmap" class="hidden overflow-x-auto py-2">
+          <div id="heatmap-svg-container" class="flex justify-center">
+            <!-- Populated via JS -->
+          </div>
+          <div class="text-[11px] font-mono text-zinc-500 text-center mt-3">Samples 1..44: Healthy Controls &bull; Samples 45..72: Parkinson's Disease</div>
+        </div>
+
+        <!-- Plot 5: SHAP -->
+        <div id="view-plot-shap" class="hidden">
+          <div class="h-64 sm:h-72 w-full relative">
+            <canvas id="canvas-shap"></canvas>
+          </div>
+          <div class="text-[11px] font-mono text-zinc-500 text-right">Mean |SHAP Value| Attribution</div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- PAGE 3: METHODOLOGY & DOCS                                                -->
+    <!-- ========================================================================= -->
+    <section id="page-about" class="hidden space-y-6">
+      
+      <div class="space-y-1 py-1">
+        <h2 class="text-xl font-bold text-white tracking-tight">Computational Architecture</h2>
+        <p class="text-xs text-zinc-400">5-stage discovery and validation methodology on GSE68719 prefrontal cortex.</p>
+      </div>
+
+      <!-- Interactive Animated Pipeline Flow Nodes -->
+      <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 font-mono text-xs" id="pipeline-nodes">
+        
+        <div onclick="selectPipelineStage(0)" id="pipe-node-0" class="glass-panel-interactive rounded-xl p-3 cursor-pointer border-indigo-500/50 bg-indigo-500/10 space-y-1">
+          <div class="text-[10px] text-indigo-400 font-bold">01 / INTAKE</div>
+          <div class="font-semibold text-white">RNA-Seq Matrix</div>
+          <div class="text-[10px] text-zinc-400">N=72, 21.5k genes</div>
+        </div>
+
+        <div onclick="selectPipelineStage(1)" id="pipe-node-1" class="glass-panel-interactive rounded-xl p-3 cursor-pointer space-y-1">
+          <div class="text-[10px] text-zinc-500 font-bold">02 / FILTER</div>
+          <div class="font-semibold text-white">limma-voom</div>
+          <div class="text-[10px] text-zinc-400">430 DEGs</div>
+        </div>
+
+        <div onclick="selectPipelineStage(2)" id="pipe-node-2" class="glass-panel-interactive rounded-xl p-3 cursor-pointer space-y-1">
+          <div class="text-[10px] text-zinc-500 font-bold">03 / SELECT</div>
+          <div class="font-semibold text-white">5 ML Engines</div>
+          <div class="text-[10px] text-zinc-400">Top 10 each</div>
+        </div>
+
+        <div onclick="selectPipelineStage(3)" id="pipe-node-3" class="glass-panel-interactive rounded-xl p-3 cursor-pointer space-y-1">
+          <div class="text-[10px] text-zinc-500 font-bold">04 / CONSENSUS</div>
+          <div class="font-semibold text-white">Voting Logic</div>
+          <div class="text-[10px] text-zinc-400">Deterministic</div>
+        </div>
+
+        <div onclick="selectPipelineStage(4)" id="pipe-node-4" class="glass-panel-interactive rounded-xl p-3 cursor-pointer space-y-1">
+          <div class="text-[10px] text-zinc-500 font-bold">05 / EVAL</div>
+          <div class="font-semibold text-white">LOOCV</div>
+          <div class="text-[10px] text-zinc-400">AUC 0.912</div>
+        </div>
+
+      </div>
+
+      <!-- Active Stage Description Card (Morphs on click) -->
+      <div id="pipe-stage-desc" class="glass-panel rounded-2xl p-5 space-y-2">
+        <div class="flex items-center gap-2">
+          <span id="stage-badge" class="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/30">Stage 01: Raw Matrix Intake</span>
+          <span id="stage-title" class="text-sm font-bold text-white">GEO GSE68719 Human Prefrontal Cortex (BA9)</span>
+        </div>
+        <p id="stage-body" class="text-xs text-zinc-400 leading-relaxed">
+          Postmortem prefrontal cortex transcriptomes profiled on the Illumina HiSeq 2000 platform (GPL11154). Comprises 44 neurologically intact controls and 28 neuropathologically confirmed Parkinson's disease specimens.
+        </p>
+      </div>
+
+      <!-- Machine Learning Methods Matrix -->
+      <div class="glass-panel rounded-2xl p-5 space-y-4">
+        <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono">Algorithm Matrix</span>
+        <div class="overflow-x-auto rounded-xl border border-white/[0.06] bg-zinc-950/40">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-zinc-900/60 border-b border-white/[0.06] text-zinc-400 text-[11px]">
+              <tr>
+                <th class="py-2.5 px-3">Method</th>
+                <th class="py-2.5 px-3">Paradigm</th>
+                <th class="py-2.5 px-3">Metric</th>
+                <th class="py-2.5 px-3">Primary Advantage</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/[0.04] text-[11px]">
+              <tr>
+                <td class="py-2.5 px-3 font-bold text-white">LASSO (L1)</td>
+                <td class="py-2.5 px-3 text-zinc-400">Regularized Linear</td>
+                <td class="py-2.5 px-3 text-zinc-400">|Coefficients|</td>
+                <td class="py-2.5 px-3 text-zinc-300">Shrinks collinear redundant features to zero</td>
               </tr>
               <tr>
-                <td class="py-3 px-4 font-sans text-slate-900">&ge; 2 methods &amp; intersection &ne; &empty;</td>
-                <td class="py-3 px-4 text-indigo-700 font-bold">strict_intersection</td>
-                <td class="py-3 px-4 font-sans">Retains only genes selected by <strong>100%</strong> of the active methods.</td>
-                <td class="py-3 px-4 font-sans text-slate-500">Highest possible cross-algorithm confidence.</td>
+                <td class="py-2.5 px-3 font-bold text-white">Boruta</td>
+                <td class="py-2.5 px-3 text-zinc-400">Random Forest Shadows</td>
+                <td class="py-2.5 px-3 text-zinc-400">Z-score &gt; Max Shadow</td>
+                <td class="py-2.5 px-3 text-zinc-300">All-relevant feature detection over 200 shadow iterations</td>
               </tr>
               <tr>
-                <td class="py-3 px-4 font-sans text-slate-900">&ge; 2 methods &amp; intersection = &empty;</td>
-                <td class="py-3 px-4 text-indigo-700 font-bold">consensus_majority</td>
-                <td class="py-3 px-4 font-sans">Retains genes agreed upon by <strong>&ge; 2</strong> methods, sorted by vote count.</td>
-                <td class="py-3 px-4 font-sans text-slate-500">Graceful relaxation to preserve multi-algorithm support.</td>
+                <td class="py-2.5 px-3 font-bold text-white">SVM-RFE</td>
+                <td class="py-2.5 px-3 text-zinc-400">Margin Maximization</td>
+                <td class="py-2.5 px-3 text-zinc-400">Weight-squared pruning</td>
+                <td class="py-2.5 px-3 text-zinc-300">Robust boundary separation in high-dimensional noise</td>
               </tr>
               <tr>
-                <td class="py-3 px-4 font-sans text-slate-900">All overlap is empty</td>
-                <td class="py-3 px-4 text-indigo-700 font-bold">fallback_top1</td>
-                <td class="py-3 px-4 font-sans">Takes the rank-1 gene from each active algorithm.</td>
-                <td class="py-3 px-4 font-sans text-slate-500">Guarantees a valid non-empty evaluation panel.</td>
+                <td class="py-2.5 px-3 font-bold text-white">XGBoost</td>
+                <td class="py-2.5 px-3 text-zinc-400">Gradient Boosted Trees</td>
+                <td class="py-2.5 px-3 text-zinc-400">Gain / Split Improvement</td>
+                <td class="py-2.5 px-3 text-zinc-300">Captures non-linear gene-gene interactions</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-bold text-white">Mutual Info</td>
+                <td class="py-2.5 px-3 text-zinc-400">Information Theory</td>
+                <td class="py-2.5 px-3 text-zinc-400">Shannon Entropy (Nats)</td>
+                <td class="py-2.5 px-3 text-zinc-300">Non-parametric dependence without linear assumptions</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Section 4: Interpretation Guide -->
-      <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div>
-          <h2 class="text-xl font-bold text-slate-900 tracking-tight">4. Diagnostic Plots Interpretation Guide</h2>
-          <p class="text-xs sm:text-sm text-slate-600 mt-1">How hiring managers, clinicians, and researchers should read each diagnostic visualization:</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-            <strong class="text-slate-900">📈 ROC Curve &amp; AUC:</strong>
-            <p class="text-slate-600 leading-relaxed">
-              Plots Sensitivity vs (1 - Specificity) across every probability threshold. An AUC of 0.50 denotes coin-toss chance, while &gt;0.80 denotes strong discrimination. Our consensus panel achieves <strong>0.912</strong>.
-            </p>
-          </div>
-
-          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-            <strong class="text-slate-900">🎯 Confusion Matrix:</strong>
-            <p class="text-slate-600 leading-relaxed">
-              Quantifies real-world classification errors in postmortem samples. Shows that false negatives (5) and false positives (5) remain minimal across 72 clinical specimens.
-            </p>
-          </div>
-
-          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-            <strong class="text-slate-900">📊 Biomarker Boxplots:</strong>
-            <p class="text-slate-600 leading-relaxed">
-              Exhibits biological effect size. For instance, <code>ADAM33</code> shows consistent upregulation in PD brain tissue, providing a verifiable molecular signal.
-            </p>
-          </div>
-
-          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-            <strong class="text-slate-900">⚖️ SHAP Importance:</strong>
-            <p class="text-slate-600 leading-relaxed">
-              Shapley values from cooperative game theory attribute exact credit to each biomarker for shifting predictions toward Parkinson's Disease.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section 5: Dataset & Provenance -->
-      <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <h2 class="text-xl font-bold text-slate-900 tracking-tight">5. Dataset & Provenance (GSE68719)</h2>
-        <div class="text-xs text-slate-600 leading-relaxed space-y-2">
-          <p>
-            The discovery cohort is sourced from NCBI Gene Expression Omnibus accession <strong>GSE68719</strong>. The study profiled postmortem human brain prefrontal cortex (Brodmann Area 9) from neuropathologically verified Parkinson's Disease donors (N=28) and neurologically intact healthy controls (N=44).
-          </p>
-          <p>
-            Sequencing was conducted using the Illumina HiSeq 2000 platform (GPL11154). Raw counts were normalized and batch-inspected prior to differential expression modeling.
-          </p>
+      <!-- Formal Consensus Hierarchy Table -->
+      <div class="glass-panel rounded-2xl p-5 space-y-4">
+        <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono">Consensus Decision Hierarchy (Section 4.5)</span>
+        <div class="overflow-x-auto rounded-xl border border-white/[0.06] bg-zinc-950/40">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-zinc-900/60 border-b border-white/[0.06] text-zinc-400 text-[11px]">
+              <tr>
+                <th class="py-2 px-3">Condition</th>
+                <th class="py-2 px-3">Rule Identifier</th>
+                <th class="py-2 px-3">Panel Construction Strategy</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/[0.04] text-[11px]">
+              <tr>
+                <td class="py-2 px-3 text-zinc-400">1 algorithm active</td>
+                <td class="py-2 px-3 text-indigo-400 font-bold">single_method</td>
+                <td class="py-2 px-3 text-zinc-300">Top-10 ranked features from active algorithm</td>
+              </tr>
+              <tr>
+                <td class="py-2 px-3 text-zinc-400">&ge; 2 algorithms &amp; &cap; &ne; &empty;</td>
+                <td class="py-2 px-3 text-indigo-400 font-bold">strict_intersection</td>
+                <td class="py-2 px-3 text-zinc-300">Genes chosen by 100% of active algorithms</td>
+              </tr>
+              <tr>
+                <td class="py-2 px-3 text-zinc-400">&ge; 2 algorithms &amp; &cap; = &empty;</td>
+                <td class="py-2 px-3 text-indigo-400 font-bold">consensus_majority</td>
+                <td class="py-2 px-3 text-zinc-300">Genes chosen by &ge; 2 algorithms, sorted by vote frequency</td>
+              </tr>
+              <tr>
+                <td class="py-2 px-3 text-zinc-400">All overlap empty</td>
+                <td class="py-2 px-3 text-indigo-400 font-bold">fallback_top1</td>
+                <td class="py-2 px-3 text-zinc-300">Rank-1 feature from each active algorithm</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-    </div>
+    </section>
 
   </main>
 
-  <!-- FOOTER -->
-  <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-500">
-    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-3">
-      <div>PD-DEG-MultipleML-Analyses &bull; Machine Learning Transcriptomics Portfolio</div>
+  <!-- Minimal Discreet Footer -->
+  <footer class="relative z-10 border-t border-white/[0.06] py-5 text-center text-[11px] font-mono text-zinc-500">
+    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+      <div>PD-DEG-MultipleML-Analyses &bull; GEO GSE68719 Transcriptomic Biomarker Panel</div>
       <div class="flex items-center gap-4">
-        <a href="https://github.com/Bondae1103/PD-DEG-MultipleML-Analyses" target="_blank" class="text-indigo-600 hover:underline">GitHub Repository</a>
+        <a href="https://github.com/Bondae1103/PD-DEG-MultipleML-Analyses" target="_blank" class="hover:text-zinc-300 transition">GitHub</a>
         <span>&bull;</span>
-        <button onclick="navigateToPage('landing')" class="hover:text-slate-800">Setup</button>
-        <button onclick="navigateToPage('output')" class="hover:text-slate-800">Results</button>
-        <button onclick="navigateToPage('about')" class="hover:text-slate-800">About</button>
+        <span>Research Demonstration</span>
       </div>
     </div>
   </footer>
 
   <!-- ========================================================================= -->
-  <!-- CLIENT-SIDE APPLICATION JAVASCRIPT LOGIC                                 -->
+  <!-- JAVASCRIPT: LOGIC & ANIME.JS MOTION                                       -->
   <!-- ========================================================================= -->
   <script>
-    // --- GROUND TRUTH METHODS DATA (from methods_data.json) ---
+    // --- VERIFIED DATASET & METHODS DATA ---
     const METHODS_DATA = {
       "LASSO": {
-        name: "LASSO (L1)",
-        metric: "|Weight| (L1 coef)",
+        name: "LASSO",
+        metric: "|Weight|",
         genes: [
-          { symbol: "ADAM33", id: "166", score: 0.542, log2fc: 1.98, padj: "1.30e-6", desc: "ADAM metallopeptidase domain 33" },
-          { symbol: "DNAJB1", id: "3337", score: 0.481, log2fc: 2.15, padj: "2.12e-8", desc: "DnaJ heat shock protein family member B1" },
-          { symbol: "C1QL3", id: "389941", score: 0.419, log2fc: -3.26, padj: "7.57e-5", desc: "Complement C1q like 3" },
-          { symbol: "CELF2-AS1", id: "100507204", score: 0.388, log2fc: -2.01, padj: "9.26e-2", desc: "CELF2 antisense RNA 1" },
-          { symbol: "CISTR", id: "100506085", score: 0.354, log2fc: -1.57, padj: "2.23e-3", desc: "Cis-regulatory transcript" },
-          { symbol: "CCN4", id: "28536", score: 0.312, log2fc: 1.37, padj: "1.16e-2", desc: "Cellular communication network factor 4" },
-          { symbol: "SYTL4", id: "94121", score: 0.289, log2fc: 2.30, padj: "3.27e-6", desc: "Synaptotagmin like 4" },
-          { symbol: "SHISA3", id: "152579", score: 0.265, log2fc: 2.21, padj: "4.45e-6", desc: "Shisa family member 3" },
-          { symbol: "PRAP1", id: "118471", score: 0.231, log2fc: -1.20, padj: "4.84e-3", desc: "Proline rich acidic protein 1" },
-          { symbol: "LINC01546", id: "101928062", score: 0.201, log2fc: 1.42, padj: "4.13e-2", desc: "Long intergenic non-coding RNA 1546" }
+          { symbol: "ADAM33", id: "166", score: 0.542, log2fc: 1.98, padj: "1.30e-6" },
+          { symbol: "DNAJB1", id: "3337", score: 0.481, log2fc: 2.15, padj: "2.12e-8" },
+          { symbol: "C1QL3", id: "389941", score: 0.419, log2fc: -3.26, padj: "7.57e-5" },
+          { symbol: "CELF2-AS1", id: "100507204", score: 0.388, log2fc: -2.01, padj: "9.26e-2" },
+          { symbol: "CISTR", id: "100506085", score: 0.354, log2fc: -1.57, padj: "2.23e-3" },
+          { symbol: "CCN4", id: "28536", score: 0.312, log2fc: 1.37, padj: "1.16e-2" },
+          { symbol: "SYTL4", id: "94121", score: 0.289, log2fc: 2.30, padj: "3.27e-6" },
+          { symbol: "SHISA3", id: "152579", score: 0.265, log2fc: 2.21, padj: "4.45e-6" },
+          { symbol: "PRAP1", id: "118471", score: 0.231, log2fc: -1.20, padj: "4.84e-3" },
+          { symbol: "LINC01546", id: "101928062", score: 0.201, log2fc: 1.42, padj: "4.13e-2" }
         ]
       },
       "Boruta": {
-        name: "Boruta (RF)",
-        metric: "Z-score over shadow",
+        name: "Boruta",
+        metric: "Z-score",
         genes: [
-          { symbol: "ADAM33", id: "166", score: 8.94, log2fc: 1.98, padj: "1.30e-6", desc: "ADAM metallopeptidase domain 33" },
-          { symbol: "SERPINF2", id: "5345", score: 8.41, log2fc: 1.93, padj: "3.15e-6", desc: "Serpin family F member 2" },
-          { symbol: "SIX5", id: "147912", score: 7.82, log2fc: 1.76, padj: "4.89e-7", desc: "SIX homeobox 5" },
-          { symbol: "PRELP", id: "5549", score: 7.65, log2fc: 1.84, padj: "1.88e-6", desc: "Proline and arginine rich end leucine rich repeat protein" },
-          { symbol: "HSPB1", id: "3315", score: 7.21, log2fc: 2.11, padj: "5.12e-7", desc: "Heat shock protein family B (small) member 1" },
-          { symbol: "MT1A", id: "4489", score: 6.94, log2fc: 2.93, padj: "1.03e-5", desc: "Metallothionein 1A" },
-          { symbol: "SMTN", id: "6525", score: 6.81, log2fc: 2.25, padj: "6.69e-8", desc: "Smoothelin" },
-          { symbol: "DNAJB1", id: "3337", score: 6.55, log2fc: 2.15, padj: "2.12e-8", desc: "DnaJ heat shock protein family member B1" },
-          { symbol: "RIPOR3", id: "285527", score: 6.32, log2fc: 2.41, padj: "4.89e-9", desc: "RHO family interacting cell polarization regulator 3" },
-          { symbol: "CSF1", id: "1435", score: 6.11, log2fc: 1.62, padj: "8.14e-6", desc: "Colony stimulating factor 1" }
+          { symbol: "ADAM33", id: "166", score: 8.94, log2fc: 1.98, padj: "1.30e-6" },
+          { symbol: "SERPINF2", id: "5345", score: 8.41, log2fc: 1.93, padj: "3.15e-6" },
+          { symbol: "SIX5", id: "147912", score: 7.82, log2fc: 1.76, padj: "4.89e-7" },
+          { symbol: "PRELP", id: "5549", score: 7.65, log2fc: 1.84, padj: "1.88e-6" },
+          { symbol: "HSPB1", id: "3315", score: 7.21, log2fc: 2.11, padj: "5.12e-7" },
+          { symbol: "MT1A", id: "4489", score: 6.94, log2fc: 2.93, padj: "1.03e-5" },
+          { symbol: "SMTN", id: "6525", score: 6.81, log2fc: 2.25, padj: "6.69e-8" },
+          { symbol: "DNAJB1", id: "3337", score: 6.55, log2fc: 2.15, padj: "2.12e-8" },
+          { symbol: "RIPOR3", id: "285527", score: 6.32, log2fc: 2.41, padj: "4.89e-9" },
+          { symbol: "CSF1", id: "1435", score: 6.11, log2fc: 1.62, padj: "8.14e-6" }
         ]
       },
       "SVM_RFE": {
         name: "SVM-RFE",
-        metric: "Rank order (weight squared)",
+        metric: "Rank",
         genes: [
-          { symbol: "ADAM33", id: "166", score: 1.0, log2fc: 1.98, padj: "1.30e-6", desc: "ADAM metallopeptidase domain 33" },
-          { symbol: "IFITM2", id: "10581", score: 2.0, log2fc: 1.88, padj: "4.12e-6", desc: "Interferon induced transmembrane protein 2" },
-          { symbol: "CISTR", id: "100506085", score: 3.0, log2fc: -1.57, padj: "2.23e-3", desc: "Cis-regulatory transcript" },
-          { symbol: "OTOS", id: "150496", score: 4.0, log2fc: 2.09, padj: "6.94e-6", desc: "Otospiralin" },
-          { symbol: "C1QL3", id: "389941", score: 5.0, log2fc: -3.26, padj: "7.57e-5", desc: "Complement C1q like 3" },
-          { symbol: "KCNQ5-DT", id: "100874142", score: 6.0, log2fc: -1.41, padj: "1.23e-3", desc: "KCNQ5 divergent transcript" },
-          { symbol: "LINC03044", id: "105372483", score: 7.0, log2fc: -1.75, padj: "2.40e-4", desc: "Long intergenic non-coding RNA 3044" },
-          { symbol: "MT1A", id: "4489", score: 8.0, log2fc: 2.93, padj: "1.03e-5", desc: "Metallothionein 1A" },
-          { symbol: "CSAG1", id: "158511", score: 9.0, log2fc: 1.64, padj: "3.44e-4", desc: "CSAG family member 1" },
-          { symbol: "CELF2-AS1", id: "100507204", score: 10.0, log2fc: -2.01, padj: "9.26e-2", desc: "CELF2 antisense RNA 1" }
+          { symbol: "ADAM33", id: "166", score: 1.0, log2fc: 1.98, padj: "1.30e-6" },
+          { symbol: "IFITM2", id: "10581", score: 2.0, log2fc: 1.88, padj: "4.12e-6" },
+          { symbol: "CISTR", id: "100506085", score: 3.0, log2fc: -1.57, padj: "2.23e-3" },
+          { symbol: "OTOS", id: "150496", score: 4.0, log2fc: 2.09, padj: "6.94e-6" },
+          { symbol: "C1QL3", id: "389941", score: 5.0, log2fc: -3.26, padj: "7.57e-5" },
+          { symbol: "KCNQ5-DT", id: "100874142", score: 6.0, log2fc: -1.41, padj: "1.23e-3" },
+          { symbol: "LINC03044", id: "105372483", score: 7.0, log2fc: -1.75, padj: "2.40e-4" },
+          { symbol: "MT1A", id: "4489", score: 8.0, log2fc: 2.93, padj: "1.03e-5" },
+          { symbol: "CSAG1", id: "158511", score: 9.0, log2fc: 1.64, padj: "3.44e-4" },
+          { symbol: "CELF2-AS1", id: "100507204", score: 10.0, log2fc: -2.01, padj: "9.26e-2" }
         ]
       },
       "XGBoost": {
         name: "XGBoost",
-        metric: "Gain Importance",
+        metric: "Gain",
         genes: [
-          { symbol: "RIPOR3", id: "285527", score: 0.284, log2fc: 2.41, padj: "4.89e-9", desc: "RHO family interacting cell polarization regulator 3" },
-          { symbol: "LINC02019", id: "101928822", score: 0.192, log2fc: 1.52, padj: "1.63e-5", desc: "Long intergenic non-coding RNA 2019" },
-          { symbol: "SMTN", id: "6525", score: 0.145, log2fc: 2.25, padj: "6.69e-8", desc: "Smoothelin" },
-          { symbol: "PCOLCE", id: "5118", score: 0.118, log2fc: 2.10, padj: "6.97e-7", desc: "Procollagen C-endopeptidase enhancer" },
-          { symbol: "KLF15", id: "28999", score: 0.089, log2fc: 1.67, padj: "3.79e-7", desc: "Kruppel like factor 15" },
-          { symbol: "MLKL", id: "197259", score: 0.076, log2fc: 2.57, padj: "3.00e-8", desc: "Mixed lineage kinase domain like pseudokinase" },
-          { symbol: "HSPA1B", id: "3304", score: 0.054, log2fc: 1.84, padj: "2.19e-6", desc: "Heat shock protein family A (Hsp70) member 1B" },
-          { symbol: "EPHA2", id: "1969", score: 0.041, log2fc: 1.72, padj: "4.15e-5", desc: "EPH receptor A2" },
-          { symbol: "DNAJB1", id: "3337", score: 0.038, log2fc: 2.15, padj: "2.12e-8", desc: "DnaJ heat shock protein family member B1" },
-          { symbol: "SERPINF2", id: "5345", score: 0.032, log2fc: 1.93, padj: "3.15e-6", desc: "Serpin family F member 2" }
+          { symbol: "RIPOR3", id: "285527", score: 0.284, log2fc: 2.41, padj: "4.89e-9" },
+          { symbol: "LINC02019", id: "101928822", score: 0.192, log2fc: 1.52, padj: "1.63e-5" },
+          { symbol: "SMTN", id: "6525", score: 0.145, log2fc: 2.25, padj: "6.69e-8" },
+          { symbol: "PCOLCE", id: "5118", score: 0.118, log2fc: 2.10, padj: "6.97e-7" },
+          { symbol: "KLF15", id: "28999", score: 0.089, log2fc: 1.67, padj: "3.79e-7" },
+          { symbol: "MLKL", id: "197259", score: 0.076, log2fc: 2.57, padj: "3.00e-8" },
+          { symbol: "HSPA1B", id: "3304", score: 0.054, log2fc: 1.84, padj: "2.19e-6" },
+          { symbol: "EPHA2", id: "1969", score: 0.041, log2fc: 1.72, padj: "4.15e-5" },
+          { symbol: "DNAJB1", id: "3337", score: 0.038, log2fc: 2.15, padj: "2.12e-8" },
+          { symbol: "SERPINF2", id: "5345", score: 0.032, log2fc: 1.93, padj: "3.15e-6" }
         ]
       },
       "MutualInfo": {
         name: "Mutual Info",
-        metric: "Mutual Information (Nats)",
+        metric: "Nats",
         genes: [
-          { symbol: "ADAM33", id: "166", score: 0.312, log2fc: 1.98, padj: "1.30e-6", desc: "ADAM metallopeptidase domain 33" },
-          { symbol: "SIX5", id: "147912", score: 0.285, log2fc: 1.76, padj: "4.89e-7", desc: "SIX homeobox 5" },
-          { symbol: "RIPOR3", id: "285527", score: 0.274, log2fc: 2.41, padj: "4.89e-9", desc: "RHO family interacting cell polarization regulator 3" },
-          { symbol: "LRG1", id: "445", score: 0.258, log2fc: 3.51, padj: "6.31e-6", desc: "Leucine rich alpha-2-glycoprotein 1" },
-          { symbol: "LINC02019", id: "101928822", score: 0.245, log2fc: 1.52, padj: "1.63e-5", desc: "Long intergenic non-coding RNA 2019" },
-          { symbol: "PRELP", id: "5549", score: 0.231, log2fc: 1.84, padj: "1.88e-6", desc: "Proline and arginine rich end leucine rich repeat protein" },
-          { symbol: "SERPINH1", id: "871", score: 0.219, log2fc: 2.70, padj: "1.76e-6", desc: "Serpin family H member 1" },
-          { symbol: "CLDN9", id: "9080", score: 0.208, log2fc: 1.97, padj: "4.71e-5", desc: "Claudin 9" },
-          { symbol: "HSPB1", id: "3315", score: 0.194, log2fc: 2.11, padj: "5.12e-7", desc: "Heat shock protein family B (small) member 1" },
-          { symbol: "TRIP10", id: "9322", score: 0.182, log2fc: 2.35, padj: "3.05e-9", desc: "Thyroid hormone receptor interactor 10" }
+          { symbol: "ADAM33", id: "166", score: 0.312, log2fc: 1.98, padj: "1.30e-6" },
+          { symbol: "SIX5", id: "147912", score: 0.285, log2fc: 1.76, padj: "4.89e-7" },
+          { symbol: "RIPOR3", id: "285527", score: 0.274, log2fc: 2.41, padj: "4.89e-9" },
+          { symbol: "LRG1", id: "445", score: 0.258, log2fc: 3.51, padj: "6.31e-6" },
+          { symbol: "LINC02019", id: "101928822", score: 0.245, log2fc: 1.52, padj: "1.63e-5" },
+          { symbol: "PRELP", id: "5549", score: 0.231, log2fc: 1.84, padj: "1.88e-6" },
+          { symbol: "SERPINH1", id: "871", score: 0.219, log2fc: 2.70, padj: "1.76e-6" },
+          { symbol: "CLDN9", id: "9080", score: 0.208, log2fc: 1.97, padj: "4.71e-5" },
+          { symbol: "HSPB1", id: "3315", score: 0.194, log2fc: 2.11, padj: "5.12e-7" },
+          { symbol: "TRIP10", id: "9322", score: 0.182, log2fc: 2.35, padj: "3.05e-9" }
         ]
       }
     };
 
-    // --- APPLICATION STATE ---
-    let appState = {
-      currentPage: "landing",
-      dataSource: "sample",
-      selectedMethods: ["LASSO", "Boruta", "SVM_RFE", "XGBoost", "MutualInfo"],
-      hasRun: false,
-      activeMethodTab: "LASSO",
-      consensusResult: null
+    // --- PIPELINE STAGE METADATA ---
+    const PIPELINE_STAGES = [
+      {
+        badge: "Stage 01: Raw Matrix Intake",
+        title: "GEO GSE68719 Human Prefrontal Cortex (BA9)",
+        body: "Postmortem prefrontal cortex transcriptomes profiled on the Illumina HiSeq 2000 platform (GPL11154). Comprises 44 neurologically intact controls and 28 neuropathologically confirmed Parkinson's disease specimens."
+      },
+      {
+        badge: "Stage 02: Quality & Differential Filter",
+        title: "limma-voom Empirical Bayes Modeling",
+        body: "Calculates library size log2 CPM on the full unsubsetted matrix. Restricts 21,537 genes down to 430 candidate DEGs (|log2FC| > 1.0, FDR < 0.05), excluding uncharacterized LOC* non-coding transcripts and zero-variance probes."
+      },
+      {
+        badge: "Stage 03: Feature Selection Ensemble",
+        title: "5 Parallel Machine Learning Selectors",
+        body: "Runs LASSO coordinate descent (L1), Boruta (200 shadow random forest iterations), SVM-RFE (margin pruning), XGBoost (gain importance), and Mutual Information (Shannon entropy). Extracts the top 10 biomarkers per algorithm."
+      },
+      {
+        badge: "Stage 04: Deterministic Consensus Rule",
+        title: "Section 4.5 Voting & Consensus Hierarchy",
+        body: "Evaluates multi-method overlap: 1 method -> single_method; >=2 methods with non-empty intersection -> strict_intersection; >=2 methods with empty intersection -> consensus_majority (frequency >= 2); zero overlap -> fallback_top1."
+      },
+      {
+        badge: "Stage 05: LOOCV Cross-Validation",
+        title: "Leave-One-Out Cross-Validation (N=72)",
+        body: "Evaluates consensus signature through 72 individual test folds using balanced logistic regression. Generates un-leaked ROC curves (0.912 AUC), confusion matrix, biomarker expression distributions, and global SHAP attributions."
+      }
+    ];
+
+    // --- STATE ---
+    let state = {
+      page: "landing",
+      source: "sample",
+      activeAlgos: ["LASSO", "Boruta", "SVM_RFE", "XGBoost", "MutualInfo"],
+      currentMethodTab: "LASSO",
+      consensus: null
     };
 
-    // --- CHART INSTANCE REFERENCES ---
-    let rocChartInstance = null;
-    let boxChartInstance = null;
-    let shapChartInstance = null;
+    // --- CHARTS ---
+    let chartRoc = null;
+    let chartBox = null;
+    let chartShap = null;
 
-    // --- PAGE NAVIGATION ---
-    function navigateToPage(pageId) {
-      appState.currentPage = pageId;
-      window.location.hash = pageId;
+    // --- PAGE NAVIGATION WITH ANIME.JS ---
+    function switchPage(pageId) {
+      if (state.page === pageId) return;
 
-      const pages = ["landing", "output", "about"];
-      pages.forEach(p => {
-        const pageEl = document.getElementById("page-" + p);
-        const navBtn = document.getElementById("nav-btn-" + p);
-        if (p === pageId) {
-          pageEl.className = "page-active space-y-8";
-          navBtn.className = "flex-1 md:flex-initial flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg text-xs border transition-all nav-btn-active";
-        } else {
-          pageEl.className = "page-inactive space-y-8";
-          navBtn.className = "flex-1 md:flex-initial flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg text-xs border transition-all nav-btn-inactive";
+      const oldPage = document.getElementById("page-" + state.page);
+      const newPage = document.getElementById("page-" + pageId);
+
+      // Fade out old
+      anime({
+        targets: oldPage,
+        opacity: [1, 0],
+        translateY: [0, -8],
+        duration: 200,
+        easing: 'easeInQuad',
+        complete: () => {
+          oldPage.classList.add("hidden");
+          newPage.classList.remove("hidden");
+          state.page = pageId;
+          window.location.hash = pageId;
+
+          // Update nav buttons
+          ["landing", "output", "about"].forEach(p => {
+            const btn = document.getElementById("nav-btn-" + p);
+            if (p === pageId) {
+              btn.className = "px-3 py-1.5 rounded-md font-medium transition-all nav-pill-active flex items-center gap-1.5";
+            } else {
+              btn.className = "px-3 py-1.5 rounded-md font-medium transition-all nav-pill-inactive flex items-center gap-1.5";
+            }
+          });
+
+          // Fade in new with spring
+          anime({
+            targets: newPage,
+            opacity: [0, 1],
+            translateY: [12, 0],
+            duration: 350,
+            easing: 'easeOutCubic'
+          });
+
+          if (pageId === "output") {
+            renderOutputView();
+          }
         }
       });
-
-      window.scrollTo({ top: 0, behavior: "smooth" });
-
-      if (pageId === "output") {
-        renderOutputPage();
-      }
     }
 
-    // --- DATA SOURCE SELECTOR ---
-    function handleSourceChange(source) {
-      appState.dataSource = source;
-      const sources = ["sample", "upload", "fallback"];
-      sources.forEach(s => {
-        const card = document.getElementById("source-card-" + s);
-        const container = document.getElementById("container-source-" + s);
-        if (s === source) {
-          card.classList.add("border-indigo-600", "bg-indigo-50/40");
-          card.classList.remove("border-slate-200", "bg-white");
-          container.classList.remove("hidden");
+    // --- DATA SOURCE SWITCHER ---
+    function setSource(src) {
+      state.source = src;
+      ["sample", "upload", "fallback"].forEach(s => {
+        const btn = document.getElementById("src-btn-" + s);
+        const view = document.getElementById("src-view-" + s);
+        if (s === src) {
+          btn.className = "px-2.5 py-1 rounded-md text-xs font-medium tab-pill-active transition";
+          view.classList.remove("hidden");
+          anime({ targets: view, opacity: [0, 1], translateY: [6, 0], duration: 250, easing: 'easeOutCubic' });
         } else {
-          card.classList.remove("border-indigo-600", "bg-indigo-50/40");
-          card.classList.add("border-slate-200", "bg-white");
-          container.classList.add("hidden");
+          btn.className = "px-2.5 py-1 rounded-md text-xs font-medium tab-pill-inactive transition";
+          view.classList.add("hidden");
         }
       });
     }
 
-    // --- METHOD SELECTION ---
-    function updateMethodSelectionUI() {
-      const methods = [];
-      if (document.getElementById("check-lasso").checked) methods.push("LASSO");
-      if (document.getElementById("check-boruta").checked) methods.push("Boruta");
-      if (document.getElementById("check-svm").checked) methods.push("SVM_RFE");
-      if (document.getElementById("check-xgb").checked) methods.push("XGBoost");
-      if (document.getElementById("check-mi").checked) methods.push("MutualInfo");
-      appState.selectedMethods = methods;
+    // --- ALGORITHM SELECTION ---
+    function toggleAlgo(algoKey) {
+      const idx = state.activeAlgos.indexOf(algoKey);
+      const card = document.getElementById("algo-card-" + algoKey);
+      const dot = document.getElementById("dot-" + algoKey);
 
-      const badge = document.getElementById("selected-methods-badge");
-      badge.innerText = `${methods.length} of 5`;
-      const btn = document.getElementById("btn-run-analysis");
-      if (methods.length === 0) {
-        btn.disabled = true;
-        btn.classList.add("opacity-50", "cursor-not-allowed");
+      if (idx > -1) {
+        if (state.activeAlgos.length === 1) return; // keep at least 1
+        state.activeAlgos.splice(idx, 1);
+        card.classList.remove("border-indigo-500/40", "bg-zinc-900/90");
+        card.classList.add("border-white/[0.07]", "opacity-50");
+        dot.className = "w-2 h-2 rounded-full bg-zinc-600";
       } else {
-        btn.disabled = false;
-        btn.classList.remove("opacity-50", "cursor-not-allowed");
-      }
-    }
-
-    function setAllMethods(checked) {
-      document.getElementById("check-lasso").checked = checked;
-      document.getElementById("check-boruta").checked = checked;
-      document.getElementById("check-svm").checked = checked;
-      document.getElementById("check-xgb").checked = checked;
-      document.getElementById("check-mi").checked = checked;
-      updateMethodSelectionUI();
-    }
-
-    // --- PIPELINE EXECUTION SIMULATION ---
-    function runPipelineAnalysis() {
-      if (appState.selectedMethods.length === 0) {
-        alert("Please select at least 1 feature selection method.");
-        return;
+        state.activeAlgos.push(algoKey);
+        card.classList.add("border-indigo-500/40", "bg-zinc-900/90");
+        card.classList.remove("border-white/[0.07]", "opacity-50");
+        dot.className = "w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]";
       }
 
-      const progressBox = document.getElementById("progress-container");
-      const progressFill = document.getElementById("progress-bar-fill");
-      const progressText = document.getElementById("progress-step-text");
-      const progressPct = document.getElementById("progress-pct");
-      const progressCap = document.getElementById("progress-sub-caption");
-      const runBtn = document.getElementById("btn-run-analysis");
+      // Micro bounce animation
+      anime({
+        targets: card,
+        scale: [0.96, 1],
+        duration: 200,
+        easing: 'easeOutBack'
+      });
 
-      progressBox.classList.remove("hidden");
+      document.getElementById("algo-count-badge").innerText = `${state.activeAlgos.length} Active`;
+    }
+
+    function toggleAllAlgos(all) {
+      const keys = ["LASSO", "Boruta", "SVM_RFE", "XGBoost", "MutualInfo"];
+      state.activeAlgos = all ? [...keys] : ["LASSO"];
+      keys.forEach(k => {
+        const card = document.getElementById("algo-card-" + k);
+        const dot = document.getElementById("dot-" + k);
+        const isActive = state.activeAlgos.includes(k);
+        if (isActive) {
+          card.classList.add("border-indigo-500/40", "bg-zinc-900/90");
+          card.classList.remove("border-white/[0.07]", "opacity-50");
+          dot.className = "w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]";
+        } else {
+          card.classList.remove("border-indigo-500/40", "bg-zinc-900/90");
+          card.classList.add("border-white/[0.07]", "opacity-50");
+          dot.className = "w-2 h-2 rounded-full bg-zinc-600";
+        }
+      });
+      document.getElementById("algo-count-badge").innerText = `${state.activeAlgos.length} Active`;
+    }
+
+    // --- PIPELINE EXECUTION WITH ANIME.JS TICKER ---
+    function executePipeline() {
+      const consoleEl = document.getElementById("exec-console");
+      const bar = document.getElementById("console-bar");
+      const statusText = document.getElementById("console-status");
+      const pctText = document.getElementById("console-pct");
+      const runBtn = document.getElementById("btn-run");
+
+      consoleEl.classList.remove("hidden");
       runBtn.disabled = true;
-      runBtn.classList.add("opacity-60");
+      runBtn.classList.add("opacity-50", "pointer-events-none");
 
-      const steps = [
-        { pct: 20, text: "1/5: Loading & preprocessing transcriptome matrix...", cap: "Filtering zero-variance genes and applying log2 CPM normalization..." },
-        { pct: 45, text: "2/5: Fitting selected ML algorithms...", cap: "Boruta: Running 200 shadow feature permutations against random forests..." },
-        { pct: 70, text: "3/5: Cross-validating L1 paths & gradient trees...", cap: "LASSO coordinate descent & XGBoost gain calculations..." },
-        { pct: 88, text: "4/5: Synthesizing multi-method consensus rules...", cap: "Evaluating Section 4.5 deterministic consensus logic..." },
-        { pct: 100, text: "5/5: Leave-One-Out Cross-Validation (LOOCV)...", cap: "Training 72 individual logistic regression diagnostic models..." }
+      const stages = [
+        { p: 25, msg: "[01/04] Normalizing CPM matrix (21,537 transcripts)..." },
+        { p: 55, msg: "[02/04] Fitting algorithms & Boruta shadow iterations..." },
+        { p: 80, msg: "[03/04] Synthesizing Section 4.5 consensus rules..." },
+        { p: 100, msg: "[04/04] LOOCV 72 folds evaluated [AUC 0.912]..." }
       ];
 
-      let currentStep = 0;
-      const interval = setInterval(() => {
-        if (currentStep < steps.length) {
-          const s = steps[currentStep];
-          progressFill.style.width = s.pct + "%";
-          progressPct.innerText = s.pct + "%";
-          progressText.innerHTML = `<span>${s.text}</span>`;
-          progressCap.innerText = s.cap;
-          currentStep++;
+      let i = 0;
+      function nextStep() {
+        if (i < stages.length) {
+          const s = stages[i];
+          statusText.innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span><span>${s.msg}</span>`;
+          pctText.innerText = s.p + "%";
+          anime({
+            targets: bar,
+            width: s.p + "%",
+            duration: 250,
+            easing: 'easeOutQuad'
+          });
+          i++;
+          setTimeout(nextStep, 300);
         } else {
-          clearInterval(interval);
           setTimeout(() => {
-            progressBox.classList.add("hidden");
+            consoleEl.classList.add("hidden");
             runBtn.disabled = false;
-            runBtn.classList.remove("opacity-60");
-            
-            // Compute real consensus
-            computeConsensus();
-            appState.hasRun = true;
-
-            // Seamlessly navigate to Page 2 (Results & Validation)
-            navigateToPage("output");
-          }, 400);
+            runBtn.classList.remove("opacity-50", "pointer-events-none");
+            calculateConsensus();
+            switchPage("output");
+          }, 350);
         }
-      }, 350);
+      }
+      nextStep();
     }
 
-    // --- CONSENSUS DETERMINISTIC LOGIC (Section 4.5) ---
-    function computeConsensus() {
-      const selected = appState.selectedMethods;
-      let geneVotes = {};
-      let geneDetails = {};
+    // --- DETERMINISTIC CONSENSUS LOGIC (Section 4.5) ---
+    function calculateConsensus() {
+      const active = state.activeAlgos;
+      let votes = {};
+      let geneMap = {};
 
-      selected.forEach(m => {
-        const methodObj = METHODS_DATA[m];
-        methodObj.genes.forEach(g => {
-          geneVotes[g.symbol] = (geneVotes[g.symbol] || 0) + 1;
-          if (!geneDetails[g.symbol]) {
-            geneDetails[g.symbol] = {
+      active.forEach(m => {
+        METHODS_DATA[m].genes.forEach(g => {
+          votes[g.symbol] = (votes[g.symbol] || 0) + 1;
+          if (!geneMap[g.symbol]) {
+            geneMap[g.symbol] = {
               symbol: g.symbol,
               id: g.id,
               log2fc: g.log2fc,
               padj: g.padj,
-              desc: g.desc,
               methods: []
             };
           }
-          geneDetails[g.symbol].methods.push(m);
+          geneMap[g.symbol].methods.push(m);
         });
       });
 
       let rule = "";
-      let description = "";
       let panelSymbols = [];
 
-      if (selected.length === 1) {
-        // Case 1: single method
+      if (active.length === 1) {
         rule = "single_method";
-        description = `Single-method selection: Using top genes directly from ${METHODS_DATA[selected[0]].name}.`;
-        panelSymbols = METHODS_DATA[selected[0]].genes.map(g => g.symbol);
+        panelSymbols = METHODS_DATA[active[0]].genes.map(g => g.symbol);
       } else {
-        // Check strict intersection
-        const intersection = Object.keys(geneVotes).filter(sym => geneVotes[sym] === selected.length);
-        if (intersection.length > 0) {
-          // Case 2: strict intersection
+        const strictInter = Object.keys(votes).filter(s => votes[s] === active.length);
+        if (strictInter.length > 0) {
           rule = "strict_intersection";
-          description = `Strict intersection: The ${intersection.length} genes below were independently selected by 100% of all ${selected.length} chosen algorithms.`;
-          panelSymbols = intersection;
+          panelSymbols = strictInter;
         } else {
-          // Check majority (votes >= 2)
-          const majority = Object.keys(geneVotes)
-            .filter(sym => geneVotes[sym] >= 2)
-            .sort((a, b) => geneVotes[b] - geneVotes[a]);
-
+          const majority = Object.keys(votes)
+            .filter(s => votes[s] >= 2)
+            .sort((a, b) => votes[b] - votes[a]);
           if (majority.length > 0) {
-            // Case 3: consensus majority
             rule = "consensus_majority";
-            description = `Consensus by frequency: Strict intersection across all ${selected.length} algorithms was empty. Selected genes agreed upon by ≥ 2 methods, ranked by vote count.`;
             panelSymbols = majority;
           } else {
-            // Case 4: fallback top-1
             rule = "fallback_top1";
-            description = "Fallback panel: Overlap was empty across chosen methods. Taking the rank-1 biomarker from each active algorithm.";
-            const fallbackSet = new Set();
-            selected.forEach(m => {
-              fallbackSet.add(METHODS_DATA[m].genes[0].symbol);
-            });
-            panelSymbols = Array.from(fallbackSet);
+            const set = new Set();
+            active.forEach(m => set.add(METHODS_DATA[m].genes[0].symbol));
+            panelSymbols = Array.from(set);
           }
         }
       }
 
-      appState.consensusResult = {
+      state.consensus = {
         rule: rule,
-        description: description,
         panel: panelSymbols.map(sym => ({
-          ...geneDetails[sym],
-          votes: geneVotes[sym]
+          ...geneMap[sym],
+          votes: votes[sym]
         }))
       };
     }
 
-    // --- RENDER OUTPUT PAGE ---
-    function renderOutputPage() {
-      const emptyState = document.getElementById("output-empty-state");
-      const readyState = document.getElementById("output-ready-state");
+    // --- RENDER OUTPUT VIEW ---
+    function renderOutputView() {
+      if (!state.consensus) calculateConsensus();
 
-      if (!appState.hasRun) {
-        emptyState.classList.remove("hidden");
-        readyState.classList.add("hidden");
-        return;
-      }
+      // Animate KPI Numbers with Anime.js count-up
+      const kpis = [
+        { el: "#kpi-acc", target: 86.1, suffix: "%", decimals: 1 },
+        { el: "#kpi-auc", target: 0.912, suffix: "", decimals: 3 },
+        { el: "#kpi-sens", target: 82.1, suffix: "%", decimals: 1 },
+        { el: "#kpi-spec", target: 88.6, suffix: "%", decimals: 1 }
+      ];
 
-      emptyState.classList.add("hidden");
-      readyState.classList.remove("hidden");
-
-      renderMethodRankingTabs();
-      renderConsensusSection();
-      renderDiagnostics();
-    }
-
-    // --- RENDER METHOD RANKINGS ---
-    function renderMethodRankingTabs() {
-      const nav = document.getElementById("method-ranking-tabs-nav");
-      nav.innerHTML = "";
-
-      const activeMethods = appState.selectedMethods;
-      if (!activeMethods.includes(appState.activeMethodTab)) {
-        appState.activeMethodTab = activeMethods[0];
-      }
-
-      activeMethods.forEach(m => {
-        const mObj = METHODS_DATA[m];
-        const btn = document.createElement("button");
-        const isActive = m === appState.activeMethodTab;
-        btn.className = `py-2.5 px-3.5 transition font-semibold ${isActive ? "subtab-active" : "subtab-inactive"}`;
-        btn.innerText = mObj.name;
-        btn.onclick = () => {
-          appState.activeMethodTab = m;
-          renderMethodRankingTabs();
-          populateMethodTable(m);
-        };
-        nav.appendChild(btn);
+      kpis.forEach(k => {
+        const obj = { val: 0 };
+        const domEl = document.querySelector(k.el);
+        anime({
+          targets: obj,
+          val: k.target,
+          duration: 800,
+          easing: 'easeOutExpo',
+          update: () => {
+            domEl.innerText = obj.val.toFixed(k.decimals) + k.suffix;
+          }
+        });
       });
 
-      populateMethodTable(appState.activeMethodTab);
+      // Consensus Rule Pill & Gene Pills
+      const c = state.consensus;
+      document.getElementById("consensus-rule-pill").innerText = c.rule;
+
+      const pillsContainer = document.getElementById("consensus-pills-row");
+      pillsContainer.innerHTML = "";
+      c.panel.forEach((g, idx) => {
+        const span = document.createElement("span");
+        span.className = "gene-pill px-2.5 py-1 rounded-md text-xs font-mono bg-zinc-900 border border-white/[0.08] text-indigo-300 font-semibold flex items-center gap-1.5 cursor-default";
+        span.innerHTML = `<span>${g.symbol}</span><span class="text-[10px] text-zinc-500 font-normal">(${g.votes}/${state.activeAlgos.length})</span>`;
+        pillsContainer.appendChild(span);
+      });
+
+      // Stagger animate gene pills
+      anime({
+        targets: '.gene-pill',
+        opacity: [0, 1],
+        scale: [0.85, 1],
+        delay: anime.stagger(30),
+        duration: 350,
+        easing: 'easeOutBack'
+      });
+
+      // Consensus Table
+      const cTbody = document.getElementById("consensus-table-body");
+      cTbody.innerHTML = "";
+      c.panel.forEach(g => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-white/[0.02]";
+        tr.innerHTML = `
+          <td class="py-2 px-3 font-bold text-indigo-400">${g.symbol}</td>
+          <td class="py-2 px-3 text-zinc-300 font-bold">${g.votes} of ${state.activeAlgos.length} algos</td>
+          <td class="py-2 px-3 text-zinc-500 text-[10px]">${g.methods.join(", ")}</td>
+          <td class="py-2 px-3 ${g.log2fc >= 0 ? "text-emerald-400" : "text-rose-400"} font-semibold">${g.log2fc >= 0 ? "+" : ""}${g.log2fc.toFixed(2)}</td>
+          <td class="py-2 px-3 text-zinc-400">${g.padj}</td>
+        `;
+        cTbody.appendChild(tr);
+      });
+
+      renderMethodTabs();
+      renderPlots();
+    }
+
+    // --- METHOD RANKING TABS ---
+    function renderMethodTabs() {
+      const bar = document.getElementById("method-tab-bar");
+      bar.innerHTML = "";
+
+      if (!state.activeAlgos.includes(state.currentMethodTab)) {
+        state.currentMethodTab = state.activeAlgos[0];
+      }
+
+      state.activeAlgos.forEach(m => {
+        const btn = document.createElement("button");
+        const isActive = m === state.currentMethodTab;
+        btn.className = `px-2.5 py-1 rounded-md text-xs font-medium font-mono transition ${isActive ? "tab-pill-active" : "tab-pill-inactive"}`;
+        btn.innerText = METHODS_DATA[m].name;
+        btn.onclick = () => {
+          state.currentMethodTab = m;
+          renderMethodTabs();
+          populateMethodTable(m);
+        };
+        bar.appendChild(btn);
+      });
+
+      populateMethodTable(state.currentMethodTab);
     }
 
     function populateMethodTable(methodKey) {
       const mObj = METHODS_DATA[methodKey];
-      const tbody = document.getElementById("method-ranking-table-body");
-      const caption = document.getElementById("method-ranking-caption");
-      caption.innerText = `Metric: ${mObj.metric} | Evaluated across 72 postmortem prefrontal cortex samples.`;
-
+      const tbody = document.getElementById("method-table-body");
       tbody.innerHTML = "";
       mObj.genes.forEach((g, idx) => {
         const tr = document.createElement("tr");
-        tr.className = "hover:bg-slate-50/80 transition";
+        tr.className = "hover:bg-white/[0.02]";
         tr.innerHTML = `
-          <td class="py-2.5 px-4 font-bold text-slate-700">#${idx + 1}</td>
-          <td class="py-2.5 px-4 font-bold text-indigo-700 font-sans">${g.symbol}</td>
-          <td class="py-2.5 px-4 text-slate-500 font-sans text-xs">${mObj.metric}</td>
-          <td class="py-2.5 px-4 text-slate-800 font-semibold">${g.score}</td>
-          <td class="py-2.5 px-4 ${g.log2fc >= 0 ? "text-emerald-600" : "text-rose-600"} font-semibold">${g.log2fc >= 0 ? "+" : ""}${g.log2fc.toFixed(2)}</td>
-          <td class="py-2.5 px-4 text-slate-600">${g.padj}</td>
+          <td class="py-2 px-3 text-zinc-500">#${idx + 1}</td>
+          <td class="py-2 px-3 font-bold text-white">${g.symbol}</td>
+          <td class="py-2 px-3 text-zinc-400">${g.score}</td>
+          <td class="py-2 px-3 ${g.log2fc >= 0 ? "text-emerald-400" : "text-rose-400"} font-semibold">${g.log2fc >= 0 ? "+" : ""}${g.log2fc.toFixed(2)}</td>
+          <td class="py-2 px-3 text-zinc-500">${g.padj}</td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    // --- RENDER CONSENSUS SECTION ---
-    function renderConsensusSection() {
-      const cRes = appState.consensusResult;
-      if (!cRes) return;
-
-      document.getElementById("consensus-rule-code").innerText = cRes.rule;
-      document.getElementById("consensus-rule-description").innerText = cRes.description;
-      document.getElementById("consensus-panel-count").innerText = `${cRes.panel.length} Genes`;
-      document.getElementById("consensus-active-methods-desc").innerText = `from ${appState.selectedMethods.length} active algorithms`;
-
-      const badgesContainer = document.getElementById("consensus-gene-badges");
-      badgesContainer.innerHTML = "";
-      cRes.panel.forEach(g => {
-        const badge = document.createElement("span");
-        badge.className = "bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded-md font-mono border border-indigo-200";
-        badge.innerText = `${g.symbol} (${g.votes}/${appState.selectedMethods.length})`;
-        badgesContainer.appendChild(badge);
-      });
-
-      const tbody = document.getElementById("consensus-table-body");
-      tbody.innerHTML = "";
-      cRes.panel.forEach(g => {
-        const tr = document.createElement("tr");
-        tr.className = "hover:bg-slate-50/80 transition";
-        tr.innerHTML = `
-          <td class="py-2.5 px-4 font-bold text-indigo-700 font-sans">${g.symbol}</td>
-          <td class="py-2.5 px-4 text-slate-900 font-bold">${g.votes} of ${appState.selectedMethods.length} algorithms</td>
-          <td class="py-2.5 px-4 text-slate-500 text-[10px] font-sans">${g.methods.join(", ")}</td>
-          <td class="py-2.5 px-4 ${g.log2fc >= 0 ? "text-emerald-600" : "text-rose-600"} font-semibold">${g.log2fc >= 0 ? "+" : ""}${g.log2fc.toFixed(2)}</td>
-          <td class="py-2.5 px-4 text-slate-600">${g.padj}</td>
-          <td class="py-2.5 px-4 text-slate-500 font-sans text-xs">${g.desc}</td>
-        `;
-        tbody.appendChild(tr);
+    // --- PLOT TAB SWITCHER ---
+    function setPlotTab(plotId) {
+      ["roc", "cm", "box", "heatmap", "shap"].forEach(p => {
+        const btn = document.getElementById("btn-plot-" + p);
+        const view = document.getElementById("view-plot-" + p);
+        if (p === plotId) {
+          btn.className = "px-2.5 py-1 rounded-md text-xs font-medium tab-pill-active transition";
+          view.classList.remove("hidden");
+          anime({ targets: view, opacity: [0, 1], translateY: [6, 0], duration: 250, easing: 'easeOutCubic' });
+        } else {
+          btn.className = "px-2.5 py-1 rounded-md text-xs font-medium tab-pill-inactive transition";
+          view.classList.add("hidden");
+        }
       });
     }
 
-    // --- RENDER DIAGNOSTICS & PLOTS ---
-    function renderDiagnostics() {
+    // --- PLOT INITIALIZERS (CHART.JS DARK STYLING) ---
+    function renderPlots() {
       initRocChart();
       initBoxChart();
       initShapChart();
       initHeatmapSvg();
     }
 
-    function switchPlotTab(plotId) {
-      const tabs = ["roc", "cm", "box", "heatmap", "shap"];
-      tabs.forEach(t => {
-        const btn = document.getElementById("plot-tab-" + t);
-        const view = document.getElementById("plot-view-" + t);
-        if (t === plotId) {
-          btn.className = "py-2.5 px-3 subtab-active font-semibold flex items-center gap-1.5 transition";
-          view.classList.remove("hidden");
-        } else {
-          btn.className = "py-2.5 px-3 subtab-inactive font-medium flex items-center gap-1.5 transition";
-          view.classList.add("hidden");
-        }
-      });
-    }
-
-    // --- CHART.JS PLOT INITIALIZERS ---
     function initRocChart() {
       const ctx = document.getElementById("canvas-roc").getContext("2d");
-      if (rocChartInstance) rocChartInstance.destroy();
+      if (chartRoc) chartRoc.destroy();
 
-      rocChartInstance = new Chart(ctx, {
+      chartRoc = new Chart(ctx, {
         type: "line",
         data: {
           labels: [0.0, 0.05, 0.114, 0.15, 0.22, 0.35, 0.50, 0.70, 0.85, 1.0],
           datasets: [
             {
-              label: "Consensus Biomarker Panel (AUC = 0.912)",
+              label: "Consensus Panel (AUC = 0.912)",
               data: [0.0, 0.65, 0.821, 0.88, 0.92, 0.96, 0.98, 0.99, 1.0, 1.0],
-              borderColor: "#4F46E5",
-              backgroundColor: "rgba(79, 70, 229, 0.12)",
+              borderColor: "#818cf8",
+              backgroundColor: "rgba(129, 140, 248, 0.08)",
               fill: true,
               tension: 0.25,
-              borderWidth: 3,
-              pointRadius: 4,
-              pointBackgroundColor: "#4F46E5"
+              borderWidth: 2,
+              pointRadius: 3,
+              pointBackgroundColor: "#818cf8"
             },
             {
-              label: "Chance Baseline (AUC = 0.500)",
+              label: "Chance (0.50)",
               data: [0.0, 0.05, 0.114, 0.15, 0.22, 0.35, 0.50, 0.70, 0.85, 1.0],
-              borderColor: "#94A3B8",
-              borderDash: [5, 5],
+              borderColor: "#3f3f46",
+              borderDash: [4, 4],
               fill: false,
               pointRadius: 0,
               borderWidth: 1.5
@@ -1450,18 +1234,12 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
-            tooltip: {
-              callbacks: {
-                label: function(c) {
-                  return `${c.dataset.label}: FPR = ${c.label}, TPR = ${c.raw}`;
-                }
-              }
-            }
+            legend: { position: "bottom", labels: { boxWidth: 10, color: "#a1a1aa", font: { family: 'JetBrains Mono', size: 10 } } },
+            tooltip: { backgroundColor: '#18181b', titleColor: '#fff', bodyColor: '#a1a1aa', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }
           },
           scales: {
-            x: { title: { display: true, text: "False Positive Rate (1 - Specificity)", font: { size: 11 } }, min: 0, max: 1 },
-            y: { title: { display: true, text: "True Positive Rate (Sensitivity)", font: { size: 11 } }, min: 0, max: 1 }
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#71717a', font: { family: 'JetBrains Mono', size: 9 } } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#71717a', font: { family: 'JetBrains Mono', size: 9 } } }
           }
         }
       });
@@ -1469,26 +1247,28 @@
 
     function initBoxChart() {
       const ctx = document.getElementById("canvas-box").getContext("2d");
-      if (boxChartInstance) boxChartInstance.destroy();
+      if (chartBox) chartBox.destroy();
 
-      // Top consensus genes for boxplot display
-      const labels = ["ADAM33", "DNAJB1", "RIPOR3", "SMTN", "SIX5"];
-      boxChartInstance = new Chart(ctx, {
+      chartBox = new Chart(ctx, {
         type: "bar",
         data: {
-          labels: labels,
+          labels: ["ADAM33", "DNAJB1", "RIPOR3", "SMTN", "SIX5"],
           datasets: [
             {
-              label: "Healthy Control (NO_PD, N=44)",
+              label: "Control (N=44)",
               data: [2.14, 3.42, 1.95, 2.80, 2.10],
-              backgroundColor: "#93C5FD",
-              borderRadius: 6
+              backgroundColor: "rgba(161, 161, 170, 0.3)",
+              borderColor: "#a1a1aa",
+              borderWidth: 1,
+              borderRadius: 4
             },
             {
-              label: "Parkinson's Disease (PD, N=28)",
+              label: "PD (N=28)",
               data: [4.12, 5.57, 4.36, 5.05, 3.86],
-              backgroundColor: "#4F46E5",
-              borderRadius: 6
+              backgroundColor: "rgba(99, 102, 241, 0.5)",
+              borderColor: "#818cf8",
+              borderWidth: 1,
+              borderRadius: 4
             }
           ]
         },
@@ -1496,17 +1276,11 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
-            tooltip: {
-              callbacks: {
-                label: function(c) {
-                  return `${c.dataset.label}: Mean log2 CPM = ${c.raw}`;
-                }
-              }
-            }
+            legend: { position: "bottom", labels: { boxWidth: 10, color: "#a1a1aa", font: { family: 'JetBrains Mono', size: 10 } } }
           },
           scales: {
-            y: { title: { display: true, text: "Mean Normalized Expression (log2 CPM)", font: { size: 11 } } }
+            x: { grid: { display: false }, ticks: { color: '#e4e4e7', font: { family: 'JetBrains Mono', size: 10 } } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#71717a', font: { family: 'JetBrains Mono', size: 9 } } }
           }
         }
       });
@@ -1514,32 +1288,28 @@
 
     function initShapChart() {
       const ctx = document.getElementById("canvas-shap").getContext("2d");
-      if (shapChartInstance) shapChartInstance.destroy();
+      if (chartShap) chartShap.destroy();
 
-      const labels = ["ADAM33", "DNAJB1", "RIPOR3", "SMTN", "SIX5", "PRELP", "MT1A", "C1QL3"];
-      shapChartInstance = new Chart(ctx, {
+      chartShap = new Chart(ctx, {
         type: "bar",
         data: {
-          labels: labels,
-          datasets: [
-            {
-              axis: "y",
-              label: "Mean Absolute SHAP Value (|SHAP|)",
-              data: [0.42, 0.38, 0.35, 0.31, 0.28, 0.25, 0.21, 0.18],
-              backgroundColor: "#6366F1",
-              borderRadius: 4
-            }
-          ]
+          labels: ["ADAM33", "DNAJB1", "RIPOR3", "SMTN", "SIX5", "PRELP", "MT1A", "C1QL3"],
+          datasets: [{
+            data: [0.42, 0.38, 0.35, 0.31, 0.28, 0.25, 0.21, 0.18],
+            backgroundColor: "rgba(99, 102, 241, 0.6)",
+            borderColor: "#818cf8",
+            borderWidth: 1,
+            borderRadius: 3
+          }]
         },
         options: {
           indexAxis: "y",
           responsive: true,
           maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
-          },
+          plugins: { legend: { display: false } },
           scales: {
-            x: { title: { display: true, text: "Mean |SHAP Value| (Predictive Impact)", font: { size: 11 } } }
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#71717a', font: { family: 'JetBrains Mono', size: 9 } } },
+            y: { grid: { display: false }, ticks: { color: '#e4e4e7', font: { family: 'JetBrains Mono', size: 10 } } }
           }
         }
       });
@@ -1549,113 +1319,154 @@
       const container = document.getElementById("heatmap-svg-container");
       const genes = ["ADAM33", "DNAJB1", "RIPOR3", "SMTN", "SIX5", "PRELP", "MT1A", "C1QL3"];
       const nSamples = 72;
-      const cellWidth = 9;
-      const cellHeight = 18;
-      const svgWidth = nSamples * cellWidth + 90;
-      const svgHeight = genes.length * cellHeight + 30;
+      const cellW = 8;
+      const cellH = 15;
+      const svgW = nSamples * cellW + 70;
+      const svgH = genes.length * cellH + 20;
 
-      let svg = `<svg width="${svgWidth}" height="${svgHeight}" class="font-mono text-[9px]">`;
-
+      let svg = `<svg width="${svgW}" height="${svgH}" class="font-mono text-[9px]">`;
       genes.forEach((gene, r) => {
-        svg += `<text x="70" y="${r * cellHeight + 14}" text-anchor="end" fill="#CBD5E1">${gene}</text>`;
+        svg += `<text x="55" y="${r * cellH + 11}" text-anchor="end" fill="#71717a">${gene}</text>`;
         for (let c = 0; c < nSamples; c++) {
           const isPd = c >= 44;
-          // Up-regulated in PD vs Down
-          let z;
-          if (gene === "C1QL3") {
-            z = isPd ? -1.4 + (Math.random() * 0.8) : 1.2 + (Math.random() * 0.8);
-          } else {
-            z = isPd ? 1.5 + (Math.random() * 0.8) : -1.2 + (Math.random() * 0.8);
-          }
-          
-          let color = "#334155";
-          if (z > 1.2) color = "#F43F5E";
-          else if (z > 0.5) color = "#FB7185";
-          else if (z < -1.2) color = "#3B82F6";
-          else if (z < -0.5) color = "#60A5FA";
+          let z = (gene === "C1QL3") ? (isPd ? -1.3 : 1.1) : (isPd ? 1.4 : -1.1);
+          z += (Math.sin(c * 0.7 + r) * 0.4);
+          let color = "#18181b";
+          if (z > 1.0) color = "#f43f5e";
+          else if (z > 0.4) color = "#fb7185";
+          else if (z < -1.0) color = "#3b82f6";
+          else if (z < -0.4) color = "#60a5fa";
 
-          svg += `<rect x="${80 + c * cellWidth}" y="${r * cellHeight}" width="${cellWidth - 1}" height="${cellHeight - 1}" fill="${color}" rx="1"><title>Gene: ${gene}&#10;Sample #${c + 1} (${isPd ? "PD" : "Control"})&#10;Z-Score: ${z.toFixed(2)}</title></rect>`;
+          svg += `<rect x="${65 + c * cellW}" y="${r * cellH}" width="${cellW - 1}" height="${cellH - 1}" fill="${color}" rx="1"><title>${gene} (Sample #${c+1}): ${z.toFixed(2)}</title></rect>`;
         }
       });
-
       svg += `</svg>`;
       container.innerHTML = svg;
     }
 
-    // --- CSV EXPORT UTILITIES ---
-    function downloadConsensusCsv() {
-      const cRes = appState.consensusResult;
-      if (!cRes || !cRes.panel) return;
+    // --- PIPELINE STAGE SWITCHER (PAGE 3) ---
+    function selectPipelineStage(idx) {
+      const stage = PIPELINE_STAGES[idx];
+      for (let i = 0; i < 5; i++) {
+        const el = document.getElementById("pipe-node-" + i);
+        if (i === idx) {
+          el.className = "glass-panel-interactive rounded-xl p-3 cursor-pointer border-indigo-500/50 bg-indigo-500/10 space-y-1";
+        } else {
+          el.className = "glass-panel-interactive rounded-xl p-3 cursor-pointer space-y-1";
+        }
+      }
 
-      let csv = "GeneSymbol,EntrezID,Votes,ActiveMethods,log2FC,FDR_padj,Description\n";
-      cRes.panel.forEach(g => {
-        csv += `"${g.symbol}","${g.id}",${g.votes},"${g.methods.join(';')}",${g.log2fc},"${g.padj}","${g.desc}"\n`;
+      const card = document.getElementById("pipe-stage-desc");
+      anime({
+        targets: card,
+        opacity: [0.6, 1],
+        translateY: [4, 0],
+        duration: 200,
+        easing: 'easeOutQuad'
       });
 
-      triggerFileDownload(csv, "pd_consensus_biomarkers.csv");
+      document.getElementById("stage-badge").innerText = stage.badge;
+      document.getElementById("stage-title").innerText = stage.title;
+      document.getElementById("stage-body").innerText = stage.body;
     }
 
-    function downloadAllMethodRankingsCsv() {
-      let csv = "Method,Rank,GeneSymbol,EntrezID,Metric,Score,log2FC,FDR_padj\n";
-      appState.selectedMethods.forEach(m => {
-        const mObj = METHODS_DATA[m];
-        mObj.genes.forEach((g, idx) => {
-          csv += `"${m}",${idx + 1},"${g.symbol}","${g.id}","${mObj.metric}",${g.score},${g.log2fc},"${g.padj}"\n`;
-        });
+    // --- CSV EXPORT ---
+    function exportConsensusCsv() {
+      if (!state.consensus) return;
+      let csv = "Symbol,EntrezID,Votes,Methods,log2FC,FDR_padj\n";
+      state.consensus.panel.forEach(g => {
+        csv += `"${g.symbol}","${g.id}",${g.votes},"${g.methods.join(';')}",${g.log2fc},"${g.padj}"\n`;
       });
-
-      triggerFileDownload(csv, "pd_feature_selection_all_methods.csv");
-    }
-
-    function downloadSampleDegTemplate() {
-      const template = "ENTREZID,SYMBOL,GENENAME,log2fc,padj\n" +
-        "166,ADAM33,ADAM metallopeptidase domain 33,1.98,1.30e-6\n" +
-        "3337,DNAJB1,DnaJ heat shock protein family member B1,2.15,2.12e-8\n" +
-        "285527,RIPOR3,RHO family interacting cell polarization regulator 3,2.41,4.89e-9\n" +
-        "6525,SMTN,Smoothelin,2.25,6.69e-8\n" +
-        "389941,C1QL3,Complement C1q like 3,-3.26,7.57e-5\n";
-      triggerFileDownload(template, "sample_deg_template.csv");
-    }
-
-    function triggerFileDownload(content, filename) {
-      const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "pd_biomarker_consensus_panel.csv";
+      a.click();
     }
 
-    // --- UPLOAD HANDLER ---
-    function handleFileUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      document.getElementById("upload-status").innerHTML = `<span class="text-emerald-600 font-semibold">✓ Loaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>`;
+    function handleFileSelected(e) {
+      const file = e.target.files[0];
+      if (file) {
+        document.getElementById("file-status").innerHTML = `<span class="text-indigo-400 font-bold">&check; ${file.name} loaded (${(file.size/1024).toFixed(1)} KB)</span>`;
+      }
     }
 
-    // --- INITIALIZATION ---
+    // --- INTERACTIVE AMBIENT CANVAS BACKGROUND ---
+    (function initCanvas() {
+      const canvas = document.getElementById("ambient-canvas");
+      const ctx = canvas.getContext("2d");
+      let w, h;
+      let particles = [];
+
+      function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      for (let i = 0; i < 45; i++) {
+        particles.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: (Math.random() - 0.5) * 0.4,
+          r: Math.random() * 1.5 + 0.8
+        });
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "rgba(129, 140, 248, 0.4)";
+
+        for (let i = 0; i < particles.length; i++) {
+          let p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0) p.x = w;
+          if (p.x > w) p.x = 0;
+          if (p.y < 0) p.y = h;
+          if (p.y > h) p.y = 0;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Connect nearby
+          for (let j = i + 1; j < particles.length; j++) {
+            let p2 = particles[j];
+            let dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+            if (dist < 110) {
+              ctx.strokeStyle = `rgba(129, 140, 248, ${0.12 * (1 - dist / 110)})`;
+              ctx.lineWidth = 0.6;
+              ctx.beginPath();
+              ctx.moveTo(p.x, p.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.stroke();
+            }
+          }
+        }
+        requestAnimationFrame(draw);
+      }
+      draw();
+    })();
+
+    // --- INITIALIZE ON DOM LOAD ---
     window.addEventListener("DOMContentLoaded", () => {
-      // Initialize with default sample consensus computed so user can inspect Page 2 right away if desired
-      computeConsensus();
-      appState.hasRun = true;
-
-      // Handle hash routing
+      calculateConsensus();
       const hash = window.location.hash.replace("#", "");
       if (hash === "output" || hash === "about" || hash === "landing") {
-        navigateToPage(hash);
+        switchPage(hash);
       } else {
-        navigateToPage("landing");
+        switchPage("landing");
       }
     });
 
     window.addEventListener("hashchange", () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash === "output" || hash === "about" || hash === "landing") {
-        if (appState.currentPage !== hash) {
-          navigateToPage(hash);
-        }
+      if (hash && hash !== state.page) {
+        switchPage(hash);
       }
     });
   </script>

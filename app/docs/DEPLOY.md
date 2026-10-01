@@ -121,7 +121,7 @@ python -m venv .venv-app
 source .venv-app/bin/activate
 
 # 3. Install pinned application requirements
-pip install -r requirements-app.txt
+pip install -r requirements.txt
 
 # 4. Launch Streamlit dashboard
 streamlit run streamlit_app.py
