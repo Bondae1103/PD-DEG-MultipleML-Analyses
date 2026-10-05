@@ -1,0 +1,4 @@
+Cohort_Accession,Study_Title,Tissue,Platform,Role,Control_Samples,PD_Samples,Total_Samples
+GSE68719,Prefrontal cortex RNA-Seq in PD and Control,Postmortem Prefrontal Cortex (BA9),Illumina HiSeq 2000 (GPL11154),Primary Discovery & Internal Cross-Validation,44,28,72
+GSE136666,Dopaminergic and Cortical profiling in Parkinsonism,Brain Frontal Gyrus,Illumina NovaSeq 6000,Independent External Validation Cohort 1,8,8,16
+GSE168496,Single-nucleus and bulk RNA-Seq in neurodegeneration,Cortex Sub-regions,Illumina NextSeq 500,Independent External Validation Cohort 2,8,8,16
